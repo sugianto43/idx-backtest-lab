@@ -8,8 +8,8 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 
 | ID | Task | Status | Depends on |
 | --- | --- | --- | --- |
-| TASK-001 | Repository bootstrap and developer tooling | Ready | — |
-| TASK-002 | Backend application skeleton and health API | Specified — blocked | TASK-001 |
+| TASK-001 | Repository bootstrap and developer tooling | Completed | — |
+| TASK-002 | Backend application skeleton and health API | Specified — ready | TASK-001 |
 | TASK-003 | DuckDB schema, migrations, and repository ports | Specified — blocked | TASK-001, TASK-002 |
 | TASK-004 | Market-data ingestion, validation, and provenance | Specified — blocked | TASK-003 |
 | TASK-005 | Instrument and corporate-action data model | Specified — blocked | TASK-003, TASK-004 |

@@ -3,7 +3,13 @@
 __pycache__/
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 node_modules/
+.next/
+out/
+coverage/
 .env
 .env.*
 !.env.example
