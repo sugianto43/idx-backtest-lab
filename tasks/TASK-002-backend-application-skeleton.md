@@ -131,13 +131,29 @@ The task is complete only after the acceptance criteria and test plan pass. Upda
 
 ## Handoff notes
 
-_To be completed by the implementing agent after verification._
-
 - Changes:
-- Commands/tests run:
-- Results:
+  - Package layout: `app/{api/{routes,schemas,errors.py,middleware.py},application,domain,infrastructure,main.py}`. `application`/`domain` are empty package markers only — no use cases exist yet.
+  - `app/main.py` exposes `create_app()` (composition factory: settings → logging → FastAPI app → middleware → exception handlers → routers) and a module-level `app = create_app()` for `uvicorn app.main:app`.
+  - `GET /health` (unversioned, dependency-free) → `{"status":"ok"}`. `GET /api/v1/health` → `{"status":"ok","service":"idx-backtesting-lab-api","version":"<Settings.version>"}`.
+  - `app/infrastructure/settings.py`: `Settings` (pydantic-settings, env prefix `APP_`, `.env` support) with `environment`, `log_level`, `host`, `port`, `version` (default `0.1.0`); `get_settings()` is `lru_cache`d. `.env.example` documents all keys.
+  - `app/infrastructure/correlation.py`: `ContextVar`-backed correlation ID get/set/generate. `app/infrastructure/logging.py`: `configure_logging(settings)` installs one `StreamHandler` with a formatter including timestamp/level/logger/correlation ID/message.
+  - `app/api/middleware.py`: `CorrelationIdMiddleware` reads `X-Correlation-Id` if present and non-empty, else generates a uuid4 hex; always echoes it in the response header and makes it available to logs/error handlers via the contextvar.
+  - `app/api/errors.py`: `ErrorBody`/`ErrorResponse` models matching `docs/API_CONVENTIONS.md` exactly; `AppError`/`NotFoundError` domain-safe exception types; `register_exception_handlers(app)` wires handlers for `StarletteHTTPException` (404 → `not_found`; other statuses → `http_error`), `RequestValidationError` (422 → `validation_error`, field-level `loc`/`message` details only), `AppError` (uses its own code/status/message), and the base `Exception` (500 → `internal_error`, full traceback logged server-side only, never returned to the client).
+- Commands/tests run (from `backend/` with `.venv` active):
+  - `ruff format --check .` → passed, 20 files already formatted.
+  - `ruff check .` → passed, all checks passed (added `[tool.ruff.lint.flake8-bugbear] extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]` to `pyproject.toml` so FastAPI's `Depends(...)` default-argument idiom doesn't trip B008).
+  - `mypy` (strict) → passed, no issues in 19 source files.
+  - `pytest -q` → passed, 7 passed (liveness payload, versioned health service/version, generated + preserved correlation ID header, 404/`not_found` envelope, 422/`validation_error` envelope with details, 500/`internal_error` envelope with no leaked exception text).
+  - `docker compose build api` → image built successfully; standalone `docker run` smoke test confirmed `/health`, `/api/v1/health`, and an unknown route's `not_found` envelope all respond correctly inside the container.
+- Results: all above commands passed with no known failures.
 - Assumptions/adaptations:
+  - Added `pydantic-settings==2.14.2` as a new direct runtime dependency (not present in TASK-001) to implement the typed configuration boundary; pinned in `requirements.txt`.
+  - Correlation ID and structured-logging primitives live in `app/infrastructure/` (contextvar + logging filter); `app/api/middleware.py` depends on that infrastructure module to set the value per request. This is a pragmatic exception to strict inward-only dependency direction for a pure cross-cutting observability concern (not a business rule, repository, or engine adapter) — no domain/application code depends on it.
+  - `422` uses `status.HTTP_422_UNPROCESSABLE_CONTENT` (the current non-deprecated Starlette/FastAPI constant name; same numeric value `422` as the contract requires) to avoid a `StarletteDeprecationWarning`.
+  - The 500/`internal_error` test uses `TestClient(..., raise_server_exceptions=False)` because Starlette's `ServerErrorMiddleware` re-raises the original exception after invoking the registered handler by design (so real ASGI servers can log it) — this only affects the test harness, not runtime HTTP behavior, which already returns the safe envelope (verified via the container smoke test's `curl` output).
 - Risks/follow-up:
+  - No dedicated `/api/v1/ready` (database) endpoint yet — that's TASK-003 scope.
+  - `application`/`domain` packages remain empty; first real use case arrives with TASK-003's repository ports.
 
 ## Next task boundary
 

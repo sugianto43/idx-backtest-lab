@@ -1,10 +1,16 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001 provides only the
-process skeleton and quality tooling: a dependency-free `/health` endpoint and
-no market-data, persistence, or strategy behavior. `.claude/ARCHITECTURE_RULES.md`
-and `docs/TDD.md` govern the layered package layout introduced by later tasks
-(`api`, `application`, `domain`, `infrastructure`).
+FastAPI application for the idx-backtesting-lab API. TASK-001/TASK-002 provide
+the process skeleton, layered package boundaries (`api`, `application`,
+`domain`, `infrastructure`), health endpoints, typed configuration, structured
+logging with correlation IDs, and a safe error envelope. No market-data,
+persistence, or strategy behavior exists yet — see
+`.claude/ARCHITECTURE_RULES.md` and `docs/TDD.md`.
+
+## Configuration
+
+Settings are typed and loaded from environment variables (prefix `APP_`), all
+optional with safe local defaults — see `.env.example`.
 
 ## Prerequisites
 
