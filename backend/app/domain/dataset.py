@@ -10,6 +10,11 @@ class DatasetValidationStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class InstrumentMappingPolicy(StrEnum):
+    PROVIDED_INTERNAL_ID = "provided_internal_id"
+    TICKER_AS_OF_IMPORT = "ticker_as_of_import"
+
+
 class DatasetValidationError(ValueError):
     pass
 
@@ -31,6 +36,7 @@ class DatasetManifest:
     coverage_start_date: date | None = None
     coverage_end_date: date | None = None
     validation_summary: str | None = None
+    instrument_mapping_policy: InstrumentMappingPolicy = InstrumentMappingPolicy.TICKER_AS_OF_IMPORT
 
     def __post_init__(self) -> None:
         if not self.dataset_id:
@@ -49,6 +55,10 @@ class DatasetManifest:
             raise DatasetValidationError("adjustment_policy must not be empty")
         if not isinstance(self.validation_status, DatasetValidationStatus):
             raise DatasetValidationError("validation_status must be a DatasetValidationStatus")
+        if not isinstance(self.instrument_mapping_policy, InstrumentMappingPolicy):
+            raise DatasetValidationError(
+                "instrument_mapping_policy must be an InstrumentMappingPolicy"
+            )
         if self.created_at_utc.tzinfo is None:
             raise DatasetValidationError("created_at_utc must be timezone-aware")
         if (

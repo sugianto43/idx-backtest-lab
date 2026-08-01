@@ -30,3 +30,17 @@ class StaleRunStatusError(ApplicationError):
         self.run_id = run_id
         self.expected = expected
         self.actual = actual
+
+
+class CsvContractViolation(ApplicationError):
+    def __init__(self, code: str, message: str, row_number: int | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.row_number = row_number
+
+
+class DatasetReimportConflictError(ApplicationError):
+    def __init__(self, existing_dataset_id: str) -> None:
+        super().__init__(f"An identical dataset already exists: {existing_dataset_id}")
+        self.existing_dataset_id = existing_dataset_id

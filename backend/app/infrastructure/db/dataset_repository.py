@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.domain.dataset import DatasetManifest, DatasetValidationStatus
+from app.domain.dataset import DatasetManifest, DatasetValidationStatus, InstrumentMappingPolicy
 from app.domain.pagination import Page
 from app.infrastructure.db.connection import connect
 from app.infrastructure.db.serialization import from_naive_utc, to_naive_utc
@@ -22,6 +22,7 @@ _COLUMNS = (
     "created_at_utc",
     "validation_status",
     "validation_summary",
+    "instrument_mapping_policy",
 )
 
 
@@ -42,6 +43,7 @@ def _row_to_dataset(row: dict[str, Any]) -> DatasetManifest:
         created_at_utc=from_naive_utc(row["created_at_utc"]),
         validation_status=DatasetValidationStatus(row["validation_status"]),
         validation_summary=row["validation_summary"],
+        instrument_mapping_policy=InstrumentMappingPolicy(row["instrument_mapping_policy"]),
     )
 
 
@@ -72,6 +74,7 @@ class DuckDBDatasetRepository:
                     to_naive_utc(dataset.created_at_utc),
                     dataset.validation_status.value,
                     dataset.validation_summary,
+                    dataset.instrument_mapping_policy.value,
                 ],
             )
         return dataset
