@@ -1,13 +1,25 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-003 provide
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-004 provide
 the process skeleton, layered package boundaries (`api`, `application`,
 `domain`, `infrastructure`), health/readiness endpoints, typed configuration,
-structured logging with correlation IDs, a safe error envelope, and a local
-DuckDB persistence boundary (dataset provenance metadata and immutable
-backtest-run manifests only — no market bars or result artifacts yet). See
-`.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`, and
-`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`.
+structured logging with correlation IDs, a safe error envelope, a local
+DuckDB persistence boundary, and offline provider-neutral CSV market-data
+ingestion. See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
+`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003, and
+`docs/CSV_INGESTION_CONTRACT.md`.
+
+## Dataset import
+
+`POST /api/v1/datasets:import` (multipart: `file` + required metadata fields
+`name`, `source_name`, `license_reference`, `bar_interval`, `timezone`,
+`adjustment_policy`, `instrument_mapping_policy`; optional `source_reference`,
+`allow_reimport`) validates a CSV file against
+`docs/CSV_INGESTION_CONTRACT.md` exactly and fails the whole import on any
+violation. `GET /api/v1/datasets/{dataset_id}` and `GET /api/v1/datasets`
+expose provenance, validation status, and warnings — never raw bars or files.
+No market-data provider, corporate-action, or ticker-resolution logic exists
+here; see TASK-005.
 
 ## Configuration
 

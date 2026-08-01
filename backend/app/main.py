@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.api.errors import register_exception_handlers
 from app.api.middleware import CorrelationIdMiddleware
+from app.api.routes.datasets import v1_datasets_router
 from app.api.routes.health import liveness_router, v1_router
 from app.api.routes.readiness import v1_readiness_router
 from app.infrastructure.db.connection import connect
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     application.include_router(liveness_router)
     application.include_router(v1_router)
     application.include_router(v1_readiness_router)
+    application.include_router(v1_datasets_router)
 
     return application
 
