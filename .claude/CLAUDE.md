@@ -36,6 +36,13 @@ Also read the closest applicable `README.md`, ADR, API contract, and test before
 5. Update documentation, contracts, and `PROJECT_MEMORY.md` if a durable decision changed.
 6. Report what changed, verification performed, and remaining risks.
 
+## Git workflow
+
+- Commit messages must not include a Claude/AI co-author trailer (e.g. no `Co-Authored-By: Claude`).
+- Before starting a task, create a new branch off `main` (e.g. `task-0XX-short-name`).
+- After the task's acceptance criteria and tests pass: commit, push the branch, open a PR against `main` referencing its GitHub issue (`Closes #N`), and merge it.
+- After merging, confirm the linked issue is closed, then `git checkout main` and pull to update the local branch.
+
 ## Definition of done
 
 Work is done only when requirements and acceptance criteria are met, tests pass, errors are actionable, documentation reflects behavior, and no known integrity risk is hidden.
