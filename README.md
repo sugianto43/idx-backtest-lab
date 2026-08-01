@@ -6,23 +6,50 @@ Local-first research tooling for transparent, reproducible backtests of Indonesi
 
 ## Current status
 
-This repository is intentionally documentation-first. It contains the AI operating system, product/technical specifications, decision records, and task contracts required for Claude Code to build the application in controlled phases. It contains no application source code, dependency configuration, data, or credentials.
+TASK-001 (repository bootstrap) is complete: a runnable FastAPI backend skeleton
+and a Next.js/TypeScript frontend skeleton exist with quality tooling, Docker
+Compose development services, and no market-data, persistence, or strategy
+behavior. Application features are introduced by subsequent tasks.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `backend/` | Backend build blueprint; source code is created by subsequent tasks |
-| `frontend/` | Frontend build blueprint; source code is created by subsequent tasks |
+| `backend/` | FastAPI application (`GET /health`) and Python quality tooling; see `backend/README.md` |
+| `frontend/` | Next.js/TypeScript application shell; see `frontend/README.md` |
 | `docs/` | Product, technical, data, API, and decision documentation |
 | `tasks/` | Executable work specifications |
 | `.claude/` | Persistent operating context for AI-assisted work |
 
+## Prerequisites
+
+- Docker and Docker Compose (recommended path)
+- Or locally: Python 3.13 and Node.js 22, for running each service without containers
+
+## Start the local development environment
+
+```bash
+docker compose up
+```
+
+- API: http://localhost:8000/health
+- Web: http://localhost:3000
+
+To run each service without Docker, see `backend/README.md` and
+`frontend/README.md` for setup and quality-check commands.
+
+## Quality gates
+
+| Service | Format | Lint | Type check | Tests |
+| --- | --- | --- | --- | --- |
+| `backend/` | `ruff format --check .` | `ruff check .` | `mypy` | `pytest -q` |
+| `frontend/` | `npm run format` | `npm run lint` | `npm run type-check` | `npm run test` |
+
 ## How Claude Code should begin
 
 1. Read `.claude/CLAUDE.md` and its required read order.
-2. Read `docs/PRD.md`, `docs/TDD.md`, and `docs/adr/ADR-001-initial-technology-boundaries.md`.
-3. Read `tasks/TASK-001-repository-bootstrap.md`.
+2. Read `docs/PRD.md`, `docs/TDD.md`, and the relevant ADRs in `docs/adr/`.
+3. Read the target task in `tasks/`.
 4. Create only the files permitted by that task, verify its acceptance criteria, then update task status and project memory.
 
 ## AI-assisted development

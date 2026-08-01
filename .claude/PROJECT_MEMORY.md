@@ -2,7 +2,14 @@
 
 ## Status
 
-Phase 2 — Application implementation has not started. The repository is documentation-only and ready for Claude Code to execute TASK-001. No application source, dependency configuration, data provider, database schema, domain API contract, or deployed environment exists yet.
+Phase 2 — Application implementation has begun. `TASK-001` is implemented and verified:
+
+- Backend: FastAPI on Python 3.13, dependency-free `GET /health` returning `{"status":"ok"}`. Quality tooling: `ruff` (format + lint), `mypy --strict`, `pytest` (with `httpx` for `TestClient`). Direct dependencies pinned in `backend/requirements.txt` / `backend/requirements-dev.txt`.
+- Frontend: Next.js 16.2.12 (App Router) + React 19.2.4 + strict TypeScript, minimal accessible landing page at `/`. Quality tooling: ESLint (`eslint-config-next` + `eslint-config-prettier`), Prettier, `tsc --noEmit`, Vitest + Testing Library.
+- `docker-compose.yml` at repo root defines `api` (port 8000) and `web` (port 3000) development services; frontend `node_modules` is an isolated named volume. Both images build and serve correctly when run directly (verified via `docker run` on alternate host ports, since ports 3000/8000 were occupied by unrelated pre-existing host processes during verification).
+- No database, market-data, strategy, or auth code exists yet — out of TASK-001 scope by design.
+
+Known risk: `npm audit` reports 3 high-severity transitive advisories (postcss, sharp) pulled in by the pinned `next@16.2.12` release itself; no fix is available without downgrading Next.js to a much older major version, which is out of scope. Revisit when a newer Next.js patch/minor release addresses this.
 
 `TASK-002` has been specified but not implemented. It defines the initial backend application boundary, health endpoints, correlation IDs, and safe API error handling; it deliberately excludes persistence and market-data work.
 
