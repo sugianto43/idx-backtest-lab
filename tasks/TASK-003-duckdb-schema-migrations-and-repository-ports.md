@@ -172,15 +172,33 @@ Complete only after every acceptance item and test-plan item has passed. Update 
 
 ## Handoff notes
 
-_To be completed by the implementing agent after verification._
-
 - Migration location and current version:
+  - `backend/migrations/0001_create_initial_schema.sql` (version 1, name `create_initial_schema`). Discovered by filename convention `NNNN_name.sql`, sorted numerically, versions must be contiguous from 1. Checksum is `sha256` of the raw file bytes, recorded in `schema_migrations.checksum`.
 - Database configuration key/default behavior:
+  - `APP_DATABASE_PATH`, default `./data/idx_backtesting_lab.duckdb` (relative to process CWD, outside the `app/` source package). Parent directory is created on first connect if missing. `data/` is git-ignored.
 - Changes:
-- Commands/tests run:
-- Results:
+  - Migration runner: `backend/app/infrastructure/db/migration_runner.py` — `discover_migrations()` (validates filename pattern, duplicate/non-contiguous versions) and `run_migrations(connection)` (idempotent, checksum-protected, fails closed on mismatch or unknown-newer DB version, wraps each migration's statements in `BEGIN/COMMIT` with `ROLLBACK` on failure).
+  - Connection: `app/infrastructure/db/connection.py` — `connect(settings)` context manager opens/closes a short-lived DuckDB connection per call; no shared global connection.
+  - Timestamp handling: `app/infrastructure/db/serialization.py` (`to_naive_utc`/`from_naive_utc`) — see the local-timezone pitfall noted in `PROJECT_MEMORY.md`.
+  - Domain: `app/domain/dataset.py` (`DatasetManifest`, `DatasetValidationStatus`), `app/domain/backtest_run.py` (`RunManifest`, `BacktestRunStatus`, `is_transition_allowed`), `app/domain/pagination.py` (`Page[T]`). All are validated, framework-independent dataclasses.
+  - Application ports: `app/application/ports/dataset_repository.py`, `app/application/ports/backtest_run_repository.py` (both `typing.Protocol`, no DuckDB/SQL types). Errors: `app/application/errors.py` (`UnknownDatasetReferenceError`, `BacktestRunNotFoundError`, `InvalidStatusTransitionError`, `StaleRunStatusError`).
+  - Infrastructure repositories: `app/infrastructure/db/dataset_repository.py` (`DuckDBDatasetRepository`), `app/infrastructure/db/backtest_run_repository.py` (`DuckDBBacktestRunRepository`). `backtest_runs.dataset_id` is enforced both by an application-level pre-check (raises `UnknownDatasetReferenceError` with a clear message) and a DB-level `REFERENCES` foreign key (defense in depth — DuckDB 1.5.5 does enforce FK constraints). `transition_status` uses `UPDATE ... WHERE run_id = ? AND status = ? RETURNING ...` for compare-and-set; zero rows updated is disambiguated into `BacktestRunNotFoundError` (no such run) vs `StaleRunStatusError` (run exists, status changed).
+  - API: `app/api/routes/readiness.py` (`GET /api/v1/ready`), `app/api/schemas/readiness.py`, `app/api/errors.py` (`DependencyUnavailableError`, code `dependency_unavailable`, `503`). `app/main.py` runs migrations once in a FastAPI `lifespan` startup hook (not per-request); a startup migration failure is logged and does not crash the process — `/health` stays up and `/ready` correctly reports `503`.
+- Commands/tests run (from `backend/` with `.venv` active):
+  - `ruff format --check .` → passed, 41 files already formatted.
+  - `ruff check .` → passed, all checks passed (added `class Page[T]` PEP 695 generic syntax to satisfy `UP046`).
+  - `mypy` (strict) → passed, no issues in 40 source files (added `[[tool.mypy.overrides]] module = "duckdb" ignore_missing_imports = true` since the `duckdb` package ships no type stubs).
+  - `pytest -q` → passed, 37 passed (migration discovery/apply/idempotency/checksum-mismatch/duplicate-version/malformed-filename/non-contiguous/future-version, dataset repository CRUD/pagination/validation, backtest-run repository CRUD/FK-rejection/status-transition success/invalid-transition/stale-CAS/not-found, timestamp UTC round-trip including a non-UTC-local-timezone case, readiness 200/503, `/health` DB-independence).
+  - `docker compose build api` → image built successfully (added `COPY migrations ./migrations` to `Dockerfile`). Standalone `docker run` smoke test confirmed real end-to-end behavior inside the container: startup migrations created `/app/data/idx_backtesting_lab.duckdb`, `GET /api/v1/ready` returned `200 {"database":"ready"}`, `/health` and `/api/v1/health` unaffected.
+- Results: all above commands passed with no known failures.
 - Assumptions/adaptations:
+  - Migrations are `.sql` files under `backend/migrations/` (per ADR-002's "SQL migration files tracked in source control"), not Python-embedded strings. The runner splits each file's content on `;` into individual statements and executes them one at a time inside an explicit transaction, since DuckDB's Python `execute()` does accept a full multi-statement script in one call (verified empirically) but per-statement execution was kept for clearer per-statement error attribution.
+  - `schema_migrations` is created by migration 0001 itself, not pre-created by the runner — the runner checks `information_schema.tables` for its existence before querying it, so a brand-new database correctly starts with zero applied migrations.
+  - DuckDB 1.5.5 does enforce foreign keys (verified empirically), and transactional DDL rollback works (verified empirically: a failed `CREATE TABLE` inside `BEGIN/ROLLBACK` leaves no table behind). Both were initially assumed uncertain and confirmed before relying on them.
+  - `is_database_ready()` never re-runs migrations; it only checks the applied-migration count against the known migration count, satisfying "must not initialize a database on every request."
 - Risks/follow-up:
+  - Each repository call opens and closes its own DuckDB connection (documented lifecycle, not a shared global connection). This is simple and correct for local single-process development; revisit if concurrent load ever becomes a concern.
+  - No dataset/backtest-run API endpoints exist yet (only the readiness check exercises the DB from HTTP) — TASK-004 and TASK-006 own those.
 
 ## Next task boundary
 

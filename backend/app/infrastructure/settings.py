@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     version: str = "0.1.0"
+    database_path: str = "./data/idx_backtesting_lab.duckdb"
 
 
 @lru_cache

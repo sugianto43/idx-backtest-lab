@@ -14,4 +14,6 @@ coverage/
 .env.*
 !.env.example
 *.duckdb
+*.duckdb.wal
+backend/data/
 *.log

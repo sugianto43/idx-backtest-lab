@@ -41,6 +41,12 @@ class NotFoundError(AppError):
     message = "The requested resource was not found."
 
 
+class DependencyUnavailableError(AppError):
+    code = "dependency_unavailable"
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    message = "A required dependency is not ready."
+
+
 def _error_response(status_code: int, code: str, message: str, details: list[Any]) -> JSONResponse:
     correlation_id = get_correlation_id() or "-"
     body = ErrorResponse(
