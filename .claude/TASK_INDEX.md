@@ -10,8 +10,8 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | --- | --- | --- | --- |
 | TASK-001 | Repository bootstrap and developer tooling | Completed | — |
 | TASK-002 | Backend application skeleton and health API | Completed | TASK-001 |
-| TASK-003 | DuckDB schema, migrations, and repository ports | Specified — ready | TASK-001, TASK-002 |
-| TASK-004 | Market-data ingestion, validation, and provenance | Specified — blocked | TASK-003 |
+| TASK-003 | DuckDB schema, migrations, and repository ports | Completed | TASK-001, TASK-002 |
+| TASK-004 | Market-data ingestion, validation, and provenance | Specified — ready | TASK-003 |
 | TASK-005 | Instrument and corporate-action data model | Specified — blocked | TASK-003, TASK-004 |
 | TASK-006 | Backtest domain model and configuration manifest | Specified — blocked | TASK-002, TASK-003, TASK-005 |
 | TASK-007 | Backtrader engine adapter and deterministic smoke strategy | Specified — blocked | TASK-004, TASK-006 |
