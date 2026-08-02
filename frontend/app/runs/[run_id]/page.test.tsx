@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import RunDetailPage from "./page";
-import { fetchRun } from "@/lib/api/runs";
+import { executeRun, fetchRun } from "@/lib/api/runs";
 import {
   fetchReproducibilityManifest,
   fetchRunArtifacts,
@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api/runs", () => ({
   fetchRun: vi.fn(),
+  executeRun: vi.fn(),
 }));
 
 vi.mock("@/lib/api/run-artifacts", () => ({
@@ -171,5 +172,49 @@ describe("RunDetailPage", () => {
     expect(screen.getByText(/zero_trades/)).toBeInTheDocument();
     expect(screen.getByText("backtrader", { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/"run_id": "run-1"/)).toBeInTheDocument();
+  });
+
+  it("shows an Execute run control only while status is created, and triggers execution", async () => {
+    const createdRun = {
+      ok: true as const,
+      data: { ...baseRun.data, status: "created" },
+    };
+    vi.mocked(fetchRun).mockResolvedValue(createdRun);
+    vi.mocked(fetchRunSummary).mockResolvedValue(notFound);
+    vi.mocked(fetchRunArtifacts).mockResolvedValue(notFound);
+    vi.mocked(fetchReproducibilityManifest).mockResolvedValue(notFound);
+    vi.mocked(fetchRunEvents).mockResolvedValue(notFound);
+    vi.mocked(fetchRunPortfolioSnapshots).mockResolvedValue(notFound);
+    vi.mocked(executeRun).mockResolvedValue({
+      ok: true,
+      data: {
+        run_id: "run-1",
+        status: "completed",
+        terminal_status: "completed",
+        failure_code: null,
+        order_count: 0,
+        fill_count: 0,
+        position_count: 0,
+        cash_event_count: 0,
+        warning_count: 0,
+        note: "",
+      },
+    });
+
+    render(<RunDetailPage />);
+
+    const button = await screen.findByRole("button", { name: "Execute run" });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(executeRun).toHaveBeenCalledWith("run-1"));
+  });
+
+  it("does not show an Execute run control once the run is completed", async () => {
+    mockAllNotFoundExceptRun();
+
+    render(<RunDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Status")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Execute run" })).not.toBeInTheDocument();
   });
 });

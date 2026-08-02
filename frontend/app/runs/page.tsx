@@ -51,6 +51,9 @@ export default function RunsPage() {
     <>
       <h1>Runs</h1>
       <Disclaimer />
+      <p>
+        <Link href="/runs/new">Create a new run</Link>
+      </p>
 
       {state.kind === "loading" && <LoadingState label="Loading runs…" />}
       {state.kind === "error" && <ErrorState error={state.error} />}
