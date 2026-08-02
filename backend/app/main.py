@@ -8,6 +8,7 @@ from app.api.errors import register_exception_handlers
 from app.api.middleware import CorrelationIdMiddleware
 from app.api.routes.datasets import v1_datasets_router
 from app.api.routes.health import liveness_router, v1_router
+from app.api.routes.instruments import v1_instruments_router
 from app.api.routes.readiness import v1_readiness_router
 from app.infrastructure.db.connection import connect
 from app.infrastructure.db.migration_runner import MigrationError, run_migrations
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     application.include_router(v1_router)
     application.include_router(v1_readiness_router)
     application.include_router(v1_datasets_router)
+    application.include_router(v1_instruments_router)
 
     return application
 
