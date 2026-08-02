@@ -22,6 +22,7 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-012 | Optimization framework with bias safeguards | Completed | TASK-008, TASK-011 |
 | TASK-013 | End-to-end quality, documentation, and release readiness | Completed | TASK-001–TASK-012 |
 | TASK-014 | Backtest run creation and execution UX | Completed | TASK-006, TASK-009, TASK-010, TASK-011 |
+| TASK-015 | Continuous integration pipeline | Completed | TASK-001–TASK-014 |
 
 ## Task template
 
