@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Disclaimer } from "@/components/layout/Disclaimer";
 import { SiteNav } from "@/components/layout/SiteNav";
@@ -18,7 +19,12 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           Skip to main content
         </a>
         <header>
-          <SiteNav />
+          <div className="site-header">
+            <Link href="/" className="brand">
+              IDX Backtesting Lab
+            </Link>
+            <SiteNav />
+          </div>
         </header>
         <main id="main-content">{children}</main>
         <footer>
