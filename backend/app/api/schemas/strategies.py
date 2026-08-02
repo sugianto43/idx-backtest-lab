@@ -1,13 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
-
-
-class SmaCrossoverParametersSchema(BaseModel):
-    fast_window: int
-    slow_window: int
-    price_field: Literal["close"]
 
 
 class SignalPolicySchema(BaseModel):
@@ -18,8 +12,8 @@ class SignalPolicySchema(BaseModel):
 
 class CreateStrategyRequest(BaseModel):
     name: str
-    kind: Literal["sma_crossover"]
-    parameters: SmaCrossoverParametersSchema
+    kind: str
+    parameters: dict[str, Any]
     signal_policy: SignalPolicySchema
 
 
@@ -29,7 +23,7 @@ class StrategySpecResponse(BaseModel):
     schema_version: int
     name: str
     kind: str
-    parameters: SmaCrossoverParametersSchema
+    parameters: dict[str, Any]
     signal_policy: SignalPolicySchema
     checksum: str
     created_at_utc: datetime

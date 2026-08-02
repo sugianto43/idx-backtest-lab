@@ -5,10 +5,14 @@ import pytest
 
 from app.domain.checksum import compute_checksum
 from app.domain.strategy_spec import (
+    BollingerBreakoutParameters,
+    MacdCrossoverParameters,
+    RsiThresholdParameters,
     SignalPolicy,
     SmaCrossoverParameters,
     StrategySpecV1,
     StrategySpecValidationError,
+    build_parameters,
 )
 
 
@@ -102,3 +106,77 @@ def test_materially_different_parameters_produce_different_checksum() -> None:
     assert compute_checksum(spec_a.to_canonical_dict()) != compute_checksum(
         spec_b.to_canonical_dict()
     )
+
+
+def test_rsi_parameters_reject_out_of_order_thresholds() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        RsiThresholdParameters(
+            period=14, oversold_threshold=70, overbought_threshold=30, price_field="close"
+        )
+
+
+def test_rsi_parameters_reject_short_period() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        RsiThresholdParameters(
+            period=1, oversold_threshold=30, overbought_threshold=70, price_field="close"
+        )
+
+
+def test_rsi_parameters_required_warmup_is_period_plus_one() -> None:
+    parameters = RsiThresholdParameters(
+        period=14, oversold_threshold=30, overbought_threshold=70, price_field="close"
+    )
+    assert parameters.required_warmup_bars() == 15
+
+
+def test_macd_parameters_reject_slow_period_not_greater_than_fast() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        MacdCrossoverParameters(
+            fast_period=26, slow_period=12, signal_period=9, price_field="close"
+        )
+
+
+def test_macd_parameters_required_warmup_is_slow_plus_signal() -> None:
+    parameters = MacdCrossoverParameters(
+        fast_period=12, slow_period=26, signal_period=9, price_field="close"
+    )
+    assert parameters.required_warmup_bars() == 35
+
+
+def test_bollinger_parameters_reject_std_dev_out_of_range() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        BollingerBreakoutParameters(period=20, num_std_dev=5, price_field="close")
+
+
+def test_bollinger_parameters_required_warmup_is_period() -> None:
+    parameters = BollingerBreakoutParameters(period=20, num_std_dev=2, price_field="close")
+    assert parameters.required_warmup_bars() == 20
+
+
+def test_build_parameters_rejects_unsupported_kind() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        build_parameters("does_not_exist", {})
+
+
+def test_build_parameters_dispatches_by_kind() -> None:
+    parameters = build_parameters(
+        "rsi_threshold",
+        {
+            "period": 14,
+            "oversold_threshold": 30,
+            "overbought_threshold": 70,
+            "price_field": "close",
+        },
+    )
+    assert isinstance(parameters, RsiThresholdParameters)
+
+
+def test_spec_rejects_kind_parameters_mismatch() -> None:
+    with pytest.raises(StrategySpecValidationError):
+        _spec(
+            kind="rsi_threshold",
+            parameters=SmaCrossoverParameters(fast_window=10, slow_window=30, price_field="close"),
+            signal_policy=SignalPolicy(
+                signal_time="bar_close", eligible_after_bars=30, long_only=True
+            ),
+        )

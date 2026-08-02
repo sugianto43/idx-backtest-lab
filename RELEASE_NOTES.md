@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-018)
+# Release Notes — v1 (TASK-001 through TASK-019)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -17,8 +17,11 @@ historical simulation only.
   range.
 - Record corporate actions as immutable evidence (no price/share
   adjustment is calculated anywhere in the system).
-- Author immutable, versioned `sma_crossover` strategy specifications
-  (long-only, next-bar-open fills, bar-close signal timing).
+- Author immutable, versioned strategy specifications in one of four kinds
+  — `sma_crossover`, `rsi_threshold`, `macd_crossover`, `bollinger_breakout`
+  (see ADR-012) — all long-only, next-bar-open fills, bar-close signal
+  timing. Each kind is a fixed, deterministic indicator rule with
+  configurable parameters; none accept custom code or expressions.
 - Create and execute a single-instrument backtest run, and retrieve its
   full immutable artifact bundle: order/fill/position/cash events,
   per-bar portfolio snapshots, 8 documented metrics (each explicitly
@@ -39,8 +42,11 @@ historical simulation only.
 
 - **Single instrument only.** Multi-instrument backtest runs and
   optimizations are explicitly rejected.
-- **One strategy kind.** Only `sma_crossover` exists — long-only, no short
-  selling, no custom code or expressions, no other indicator.
+- **Four fixed strategy kinds, no custom code.** `sma_crossover`,
+  `rsi_threshold`, `macd_crossover`, `bollinger_breakout` — all long-only,
+  no short selling, no custom code or expressions. A combination/custom
+  kind is planned but not yet implemented (TASK-020). Parameter
+  optimization (grid search) still only supports `sma_crossover`.
 - **No charting.** All evidence is presented as structured data and
   tables; no client-side or server-side chart rendering exists.
 - **8 fixed metrics.** `initial_equity`, `final_equity`, `total_return`,
@@ -157,3 +163,15 @@ a real `OPTIONS` preflight against the rebuilt running container
 - `docs/adr/ADR-011-remove-manual-csv-import.md` records the decision as a
   deliberate partial reversal of ADR-003; `docs/adr/ADR-003-...md`'s status
   line now notes the partial supersession.
+
+## Verification evidence (TASK-019)
+
+- Backend: `ruff format --check .`, `ruff check .`, `mypy .`, `pytest -q`
+  — all clean, 306 tests passed (19 new: domain validation for the three
+  new parameter dataclasses, API creation tests per kind, and Backtrader
+  engine smoke tests proving a full entry+exit signal for each new kind).
+- Frontend: `npm run format`/`lint`/`type-check` clean, `npm run test` — 94
+  passed across 23 files, `npm run build` succeeds (13 routes).
+- `docs/adr/ADR-012-additional-strategy-kinds.md` records the design,
+  including why a free-form custom-code strategy editor was explicitly
+  ruled out in favor of curated, parameterized indicator kinds.

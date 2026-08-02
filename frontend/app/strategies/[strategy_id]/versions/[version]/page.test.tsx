@@ -7,9 +7,10 @@ vi.mock("next/navigation", () => ({
   useParams: () => ({ strategy_id: "strat-1", version: "1" }),
 }));
 
-vi.mock("@/lib/api/strategies", () => ({
-  fetchStrategyVersion: vi.fn(),
-}));
+vi.mock("@/lib/api/strategies", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/strategies")>();
+  return { ...actual, fetchStrategyVersion: vi.fn() };
+});
 
 const mockedFetchStrategyVersion = vi.mocked(fetchStrategyVersion);
 

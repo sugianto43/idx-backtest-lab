@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import StrategiesPage from "./page";
 import { fetchStrategies } from "@/lib/api/strategies";
 
-vi.mock("@/lib/api/strategies", () => ({
-  fetchStrategies: vi.fn(),
-}));
+vi.mock("@/lib/api/strategies", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/strategies")>();
+  return { ...actual, fetchStrategies: vi.fn() };
+});
 
 const mockedFetchStrategies = vi.mocked(fetchStrategies);
 

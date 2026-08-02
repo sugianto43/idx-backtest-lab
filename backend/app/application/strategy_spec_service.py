@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 
 from app.application.ports.strategy_spec_repository import StrategySpecRepository
@@ -7,8 +7,8 @@ from app.domain.checksum import canonical_json_bytes, compute_checksum
 from app.domain.strategy_spec import (
     STRATEGY_SCHEMA_VERSION,
     SignalPolicy,
-    SmaCrossoverParameters,
     StrategySpecV1,
+    build_parameters,
 )
 
 
@@ -25,18 +25,14 @@ def create_strategy_spec(
     *,
     name: str,
     kind: str,
-    fast_window: int,
-    slow_window: int,
-    price_field: str,
+    parameters: Mapping[str, object],
     signal_time: str,
     eligible_after_bars: int,
     long_only: bool,
     id_factory: Callable[[], str] = _default_id_factory,
     clock: Callable[[], datetime] = _default_clock,
 ) -> StrategySpecV1:
-    parameters = SmaCrossoverParameters(
-        fast_window=fast_window, slow_window=slow_window, price_field=price_field
-    )
+    built_parameters = build_parameters(kind, parameters)
     signal_policy = SignalPolicy(
         signal_time=signal_time, eligible_after_bars=eligible_after_bars, long_only=long_only
     )
@@ -51,7 +47,7 @@ def create_strategy_spec(
         "version": version,
         "name": name,
         "kind": kind,
-        "parameters": parameters.to_canonical_dict(),
+        "parameters": built_parameters.to_canonical_dict(),
         "signal_policy": signal_policy.to_canonical_dict(),
         "created_at_utc": created_at.isoformat().replace("+00:00", "Z"),
     }
@@ -64,7 +60,7 @@ def create_strategy_spec(
         schema_version=STRATEGY_SCHEMA_VERSION,
         name=name,
         kind=kind,
-        parameters=parameters,
+        parameters=built_parameters,
         signal_policy=signal_policy,
         created_at_utc=created_at,
         checksum=checksum,

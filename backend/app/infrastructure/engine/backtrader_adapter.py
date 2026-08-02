@@ -51,12 +51,17 @@ class _ListFeed(bt.feed.DataBase):  # type: ignore[misc]
         return True
 
 
-class _SmaCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
+class _BaseCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
+    """Shared order/fill/audit machinery for every long-only, single-signal strategy kind.
+
+    Subclasses build their own indicators in ``__init__`` and implement
+    ``_entry_signal``/``_exit_signal``; everything about order submission, fill
+    accounting, and event/warning recording is identical across strategy kinds.
+    """
+
     params = (
         ("bars", None),
         ("instrument_id", None),
-        ("fast_window", None),
-        ("slow_window", None),
         ("eligible_after_bars", None),
         ("fraction", None),
         ("quantity_increment", None),
@@ -67,14 +72,6 @@ class _SmaCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
     )
 
     def __init__(self) -> None:
-        self.fast_sma = bt.indicators.SimpleMovingAverage(
-            self.data.close, period=self.p.fast_window
-        )
-        self.slow_sma = bt.indicators.SimpleMovingAverage(
-            self.data.close, period=self.p.slow_window
-        )
-        self.cross = bt.indicators.CrossOver(self.fast_sma, self.slow_sma)
-
         self.available_cash: Decimal = self.p.initial_cash
         self.order_events: list[OrderEvent] = []
         self.fill_events: list[FillEvent] = []
@@ -84,6 +81,12 @@ class _SmaCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
         self.failure_code: str | None = None
         self._order_context: dict[int, dict[str, Any]] = {}
         self._quantum = Decimal(1).scaleb(-self.p.money_scale)
+
+    def _entry_signal(self) -> bool:
+        raise NotImplementedError
+
+    def _exit_signal(self) -> bool:
+        raise NotImplementedError
 
     def _bar_at(self, index: int) -> NormalizedBar:
         bar: NormalizedBar = self.p.bars[index]
@@ -96,9 +99,9 @@ class _SmaCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
 
         bar = self._bar_at(idx)
 
-        if self.cross[0] > 0 and self.position.size == 0:
+        if self.position.size == 0 and self._entry_signal():
             self._submit_entry(bar)
-        elif self.cross[0] < 0 and self.position.size > 0:
+        elif self.position.size > 0 and self._exit_signal():
             self._submit_exit(bar)
 
     def _submit_entry(self, bar: NormalizedBar) -> None:
@@ -245,6 +248,128 @@ class _SmaCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
             self.failure_code = "missing_next_bar"
 
 
+class _SmaCrossoverStrategy(_BaseCrossoverStrategy):
+    params = (  # type: ignore[assignment]
+        ("fast_window", None),
+        ("slow_window", None),
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.fast_sma = bt.indicators.SimpleMovingAverage(
+            self.data.close, period=self.p.fast_window
+        )
+        self.slow_sma = bt.indicators.SimpleMovingAverage(
+            self.data.close, period=self.p.slow_window
+        )
+        self.cross = bt.indicators.CrossOver(self.fast_sma, self.slow_sma)
+
+    def _entry_signal(self) -> bool:
+        return bool(self.cross[0] > 0)
+
+    def _exit_signal(self) -> bool:
+        return bool(self.cross[0] < 0)
+
+
+class _RsiThresholdStrategy(_BaseCrossoverStrategy):
+    params = (  # type: ignore[assignment]
+        ("period", None),
+        ("oversold_threshold", None),
+        ("overbought_threshold", None),
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.rsi = bt.indicators.RSI(self.data.close, period=self.p.period, safediv=True)
+        self.cross_up_oversold = bt.indicators.CrossUp(self.rsi, self.p.oversold_threshold)
+        self.cross_down_overbought = bt.indicators.CrossDown(self.rsi, self.p.overbought_threshold)
+
+    def _entry_signal(self) -> bool:
+        return bool(self.cross_up_oversold[0] > 0)
+
+    def _exit_signal(self) -> bool:
+        return bool(self.cross_down_overbought[0] > 0)
+
+
+class _MacdCrossoverStrategy(_BaseCrossoverStrategy):
+    params = (  # type: ignore[assignment]
+        ("fast_period", None),
+        ("slow_period", None),
+        ("signal_period", None),
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.macd = bt.indicators.MACD(
+            self.data.close,
+            period_me1=self.p.fast_period,
+            period_me2=self.p.slow_period,
+            period_signal=self.p.signal_period,
+        )
+        self.cross = bt.indicators.CrossOver(self.macd.macd, self.macd.signal)
+
+    def _entry_signal(self) -> bool:
+        return bool(self.cross[0] > 0)
+
+    def _exit_signal(self) -> bool:
+        return bool(self.cross[0] < 0)
+
+
+class _BollingerBreakoutStrategy(_BaseCrossoverStrategy):
+    params = (  # type: ignore[assignment]
+        ("period", None),
+        ("num_std_dev", None),
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.bollinger = bt.indicators.BollingerBands(
+            self.data.close, period=self.p.period, devfactor=float(self.p.num_std_dev)
+        )
+        self.entry_cross = bt.indicators.CrossUp(self.data.close, self.bollinger.top)
+        self.exit_cross = bt.indicators.CrossDown(self.data.close, self.bollinger.mid)
+
+    def _entry_signal(self) -> bool:
+        return bool(self.entry_cross[0] > 0)
+
+    def _exit_signal(self) -> bool:
+        return bool(self.exit_cross[0] > 0)
+
+
+_STRATEGY_CLASS_AND_KWARGS: dict[str, Callable[[StrategySpecV1], tuple[type, dict[str, Any]]]] = {
+    "sma_crossover": lambda strategy: (
+        _SmaCrossoverStrategy,
+        {
+            "fast_window": strategy.parameters.fast_window,  # type: ignore[union-attr]
+            "slow_window": strategy.parameters.slow_window,  # type: ignore[union-attr]
+        },
+    ),
+    "rsi_threshold": lambda strategy: (
+        _RsiThresholdStrategy,
+        {
+            "period": strategy.parameters.period,  # type: ignore[union-attr]
+            "oversold_threshold": strategy.parameters.oversold_threshold,  # type: ignore[union-attr]
+            "overbought_threshold": strategy.parameters.overbought_threshold,  # type: ignore[union-attr]
+        },
+    ),
+    "macd_crossover": lambda strategy: (
+        _MacdCrossoverStrategy,
+        {
+            "fast_period": strategy.parameters.fast_period,  # type: ignore[union-attr]
+            "slow_period": strategy.parameters.slow_period,  # type: ignore[union-attr]
+            "signal_period": strategy.parameters.signal_period,  # type: ignore[union-attr]
+        },
+    ),
+    "bollinger_breakout": lambda strategy: (
+        _BollingerBreakoutStrategy,
+        {
+            "period": strategy.parameters.period,  # type: ignore[union-attr]
+            "num_std_dev": strategy.parameters.num_std_dev,  # type: ignore[union-attr]
+        },
+    ),
+}
+
+
 def _build_metadata(
     manifest_checksum: str,
     dataset_checksum: str,
@@ -278,16 +403,16 @@ class BacktraderEngineAdapter:
     ) -> ExecutionResult:
         started_at = clock()
         try:
+            strategy_class, strategy_kwargs = _STRATEGY_CLASS_AND_KWARGS[strategy.kind](strategy)
+
             cerebro = bt.Cerebro(stdstats=False)
             cerebro.broker.setcash(float(manifest.capital.amount))
             cerebro.broker.setcommission(commission=0.0)
             cerebro.adddata(_ListFeed(bars=bars))
             cerebro.addstrategy(
-                _SmaCrossoverStrategy,
+                strategy_class,
                 bars=bars,
                 instrument_id=instrument_id,
-                fast_window=strategy.parameters.fast_window,
-                slow_window=strategy.parameters.slow_window,
                 eligible_after_bars=strategy.signal_policy.eligible_after_bars,
                 fraction=manifest.execution.position_sizing.fraction,
                 quantity_increment=manifest.execution.rounding.quantity_increment,
@@ -295,6 +420,7 @@ class BacktraderEngineAdapter:
                 currency=manifest.capital.currency,
                 initial_cash=manifest.capital.amount,
                 id_factory=id_factory,
+                **strategy_kwargs,
             )
             strategies = cerebro.run()
         except Exception:

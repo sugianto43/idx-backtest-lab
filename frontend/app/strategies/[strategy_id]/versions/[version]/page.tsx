@@ -7,7 +7,11 @@ import { ProvenanceList } from "@/components/data/ProvenanceList";
 import { ErrorState } from "@/components/status/ErrorState";
 import { LoadingState } from "@/components/status/LoadingState";
 import { UnavailableState } from "@/components/status/UnavailableState";
-import { fetchStrategyVersion, type StrategySpecResponse } from "@/lib/api/strategies";
+import {
+  fetchStrategyVersion,
+  strategyKindConfig,
+  type StrategySpecResponse,
+} from "@/lib/api/strategies";
 import type { ApiError } from "@/lib/api/types";
 
 type State =
@@ -67,6 +71,7 @@ export default function StrategyVersionDetailPage() {
   }
 
   const spec = state.data;
+  const config = strategyKindConfig(spec.kind);
 
   return (
     <>
@@ -87,9 +92,10 @@ export default function StrategyVersionDetailPage() {
             { label: "Strategy ID", value: spec.strategy_id },
             { label: "Version", value: String(spec.version) },
             { label: "Kind", value: spec.kind },
-            { label: "Fast SMA window", value: String(spec.parameters.fast_window) },
-            { label: "Slow SMA window", value: String(spec.parameters.slow_window) },
-            { label: "Price field", value: spec.parameters.price_field },
+            ...(config?.fields.map((field) => ({
+              label: field.label,
+              value: String(spec.parameters[field.key]),
+            })) ?? []),
             { label: "Checksum", value: spec.checksum },
             { label: "Created", value: spec.created_at_utc },
           ]}
@@ -108,11 +114,10 @@ export default function StrategyVersionDetailPage() {
       <section aria-labelledby="semantics-heading">
         <h2 id="semantics-heading">What this means</h2>
         <p>
-          An upward crossover of the fast SMA above the slow SMA enters a long position; a downward
-          crossover exits an open long position. Signals are evaluated at each bar&apos;s close, but
-          any resulting order fills at the <strong>next bar&apos;s open</strong> in a backtest run —
-          never at the signal bar&apos;s own close. This specification does not execute or evaluate
-          anything by itself.
+          {config?.description ?? "This strategy kind's entry/exit rule is not recognized."} Signals
+          are evaluated at each bar&apos;s close, but any resulting order fills at the{" "}
+          <strong>next bar&apos;s open</strong> in a backtest run — never at the signal bar&apos;s
+          own close. This specification does not execute or evaluate anything by itself.
         </p>
       </section>
     </>
