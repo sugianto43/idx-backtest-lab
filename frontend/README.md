@@ -13,7 +13,9 @@ utility (`lib/format/decimal.ts`). TASK-011 adds strategy authoring
 and JSON-body POST support in `lib/api/client.ts`. TASK-012 adds the
 optimization workflow (`/optimizations`, `/optimizations/new`,
 `/optimizations/[optimization_id]`) for the backend's chronological
-train/validation/holdout parameter optimizer.
+train/validation/holdout parameter optimizer. TASK-014 adds `/runs/new` and
+an "Execute run" action on `/runs/{run_id}`, so backtest runs no longer
+require a direct API call to create or execute.
 
 ## Prerequisites
 

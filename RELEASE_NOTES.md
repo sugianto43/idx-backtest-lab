@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-013)
+# Release Notes — v1 (TASK-001 through TASK-014)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -29,7 +29,9 @@ historical simulation only.
   persisted and visible.
 - Browse all of the above through an accessible, strict-TypeScript web
   dashboard that performs no financial calculation itself — every number
-  displayed comes directly from the backend as a decimal string.
+  displayed comes directly from the backend as a decimal string. Datasets,
+  strategies, backtest runs, and optimizations can all be created and
+  executed entirely from the browser.
 
 ## Known v1 limitations
 
@@ -37,12 +39,6 @@ historical simulation only.
   optimizations are explicitly rejected.
 - **One strategy kind.** Only `sma_crossover` exists — long-only, no short
   selling, no custom code or expressions, no other indicator.
-- **No run/execute UI.** Backtest runs and their execution can only be
-  created and triggered through the API (`POST /api/v1/backtest-runs`,
-  `POST /api/v1/backtest-runs/{id}:execute`); the frontend dashboard
-  (`/runs`) can list and inspect runs but does not yet expose a
-  create/execute form. The same applies to optimizations, which the
-  frontend *can* create and execute (`/optimizations/new`).
 - **No charting.** All evidence is presented as structured data and
   tables; no client-side or server-side chart rendering exists.
 - **8 fixed metrics.** `initial_equity`, `final_equity`, `total_return`,
@@ -82,3 +78,13 @@ historical simulation only.
   `/datasets/import`, `/runs`, `/strategies`, `/strategies/new`,
   `/optimizations`, `/optimizations/new`, `/system`) returned `200` from
   the live web container pointed at the live API container.
+
+## Verification evidence (TASK-014)
+
+- Frontend: `npm run format`, `npm run lint`, `npm run type-check`,
+  `npm run test`, `npm run build` — all clean, 90 tests passed, 14 routes
+  built (adds `/runs/new` and an execute action on `/runs/{run_id}`).
+- `docker compose build web` succeeds; a live smoke test against the built
+  images confirmed `/runs/new`'s SSR shell renders, and a run created via
+  the exact payload the form sends reached `completed` after calling the
+  same execute endpoint the detail page's new "Execute run" button uses.

@@ -12,7 +12,7 @@ import { LoadingState } from "@/components/status/LoadingState";
 import { UnavailableState } from "@/components/status/UnavailableState";
 import { WarningState } from "@/components/status/WarningState";
 import { formatDecimalString } from "@/lib/format/decimal";
-import { fetchRun, type BacktestRunResponse } from "@/lib/api/runs";
+import { executeRun, fetchRun, type BacktestRunResponse } from "@/lib/api/runs";
 import {
   fetchReproducibilityManifest,
   fetchRunArtifacts,
@@ -81,13 +81,35 @@ export default function RunDetailPage() {
   const params = useParams<{ run_id: string }>();
   const runId = params.run_id;
 
-  const run = useLoadable<BacktestRunResponse>(() => fetchRun(runId), [runId]);
-  const summary = useLoadable<RunSummaryResponse>(() => fetchRunSummary(runId), [runId]);
-  const artifacts = useLoadable<RunArtifactsResponse>(() => fetchRunArtifacts(runId), [runId]);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [executing, setExecuting] = useState(false);
+  const [executeError, setExecuteError] = useState<ApiError | null>(null);
+
+  const run = useLoadable<BacktestRunResponse>(() => fetchRun(runId), [runId, reloadToken]);
+  const summary = useLoadable<RunSummaryResponse>(
+    () => fetchRunSummary(runId),
+    [runId, reloadToken],
+  );
+  const artifacts = useLoadable<RunArtifactsResponse>(
+    () => fetchRunArtifacts(runId),
+    [runId, reloadToken],
+  );
   const repro = useLoadable<ReproducibilityManifestResponse>(
     () => fetchReproducibilityManifest(runId),
-    [runId],
+    [runId, reloadToken],
   );
+
+  async function handleExecute() {
+    setExecuting(true);
+    setExecuteError(null);
+    const result = await executeRun(runId);
+    setExecuting(false);
+    if (!result.ok) {
+      setExecuteError(result.error);
+      return;
+    }
+    setReloadToken((token) => token + 1);
+  }
 
   const [eventType, setEventType] = useState<EventType>("fill");
   const [eventOffset, setEventOffset] = useState(0);
@@ -145,6 +167,15 @@ export default function RunDetailPage() {
         ) : (
           <p>No warnings recorded.</p>
         )}
+        {runData.status === "created" && (
+          <p>
+            <button type="button" onClick={handleExecute} disabled={executing}>
+              {executing ? "Executing…" : "Execute run"}
+            </button>
+          </p>
+        )}
+        {executing && <LoadingState label="Executing run…" />}
+        {executeError && <ErrorState error={executeError} />}
       </section>
 
       <section aria-labelledby="provenance-heading">
