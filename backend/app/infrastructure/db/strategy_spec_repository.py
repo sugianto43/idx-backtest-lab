@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from app.domain.pagination import Page
-from app.domain.strategy_spec import SignalPolicy, SmaCrossoverParameters, StrategySpecV1
+from app.domain.strategy_spec import SignalPolicy, StrategySpecV1, build_parameters
 from app.infrastructure.db.connection import connect
 from app.infrastructure.db.serialization import from_naive_utc, to_naive_utc
 from app.infrastructure.settings import Settings
@@ -21,7 +21,7 @@ _COLUMNS = (
 
 def _row_to_spec(row: dict[str, Any]) -> StrategySpecV1:
     canonical = json.loads(row["canonical_json"])
-    parameters = SmaCrossoverParameters(**canonical["parameters"])
+    parameters = build_parameters(row["kind"], canonical["parameters"])
     signal_policy = SignalPolicy(**canonical["signal_policy"])
     return StrategySpecV1(
         strategy_id=row["strategy_id"],

@@ -1,8 +1,11 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
 ALLOWED_PRICE_FIELDS = frozenset({"close"})
-SUPPORTED_STRATEGY_KINDS = frozenset({"sma_crossover"})
+SUPPORTED_STRATEGY_KINDS = frozenset(
+    {"sma_crossover", "rsi_threshold", "macd_crossover", "bollinger_breakout"}
+)
 STRATEGY_SCHEMA_VERSION = 1
 
 
@@ -45,6 +48,144 @@ class SmaCrossoverParameters:
             "price_field": self.price_field,
         }
 
+    def required_warmup_bars(self) -> int:
+        return self.slow_window
+
+
+@dataclass(frozen=True, slots=True)
+class RsiThresholdParameters:
+    period: int
+    oversold_threshold: int
+    overbought_threshold: int
+    price_field: str
+
+    def __post_init__(self) -> None:
+        if self.period < 2:
+            raise StrategySpecValidationError(
+                "invalid_parameters", "period must be an integer of at least 2"
+            )
+        if not (0 < self.oversold_threshold < self.overbought_threshold < 100):
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                "oversold_threshold and overbought_threshold must satisfy "
+                "0 < oversold_threshold < overbought_threshold < 100",
+            )
+        if self.price_field not in ALLOWED_PRICE_FIELDS:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"price_field must be one of {sorted(ALLOWED_PRICE_FIELDS)}",
+            )
+
+    def to_canonical_dict(self) -> dict[str, object]:
+        return {
+            "period": self.period,
+            "oversold_threshold": self.oversold_threshold,
+            "overbought_threshold": self.overbought_threshold,
+            "price_field": self.price_field,
+        }
+
+    def required_warmup_bars(self) -> int:
+        return self.period + 1
+
+
+@dataclass(frozen=True, slots=True)
+class MacdCrossoverParameters:
+    fast_period: int
+    slow_period: int
+    signal_period: int
+    price_field: str
+
+    def __post_init__(self) -> None:
+        if self.fast_period < 1:
+            raise StrategySpecValidationError(
+                "invalid_parameters", "fast_period must be a positive integer"
+            )
+        if self.slow_period <= self.fast_period:
+            raise StrategySpecValidationError(
+                "invalid_parameters", "slow_period must be greater than fast_period"
+            )
+        if self.signal_period < 1:
+            raise StrategySpecValidationError(
+                "invalid_parameters", "signal_period must be a positive integer"
+            )
+        if self.price_field not in ALLOWED_PRICE_FIELDS:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"price_field must be one of {sorted(ALLOWED_PRICE_FIELDS)}",
+            )
+
+    def to_canonical_dict(self) -> dict[str, object]:
+        return {
+            "fast_period": self.fast_period,
+            "slow_period": self.slow_period,
+            "signal_period": self.signal_period,
+            "price_field": self.price_field,
+        }
+
+    def required_warmup_bars(self) -> int:
+        return self.slow_period + self.signal_period
+
+
+@dataclass(frozen=True, slots=True)
+class BollingerBreakoutParameters:
+    period: int
+    num_std_dev: int
+    price_field: str
+
+    def __post_init__(self) -> None:
+        if self.period < 2:
+            raise StrategySpecValidationError(
+                "invalid_parameters", "period must be an integer of at least 2"
+            )
+        if not (1 <= self.num_std_dev <= 4):
+            raise StrategySpecValidationError(
+                "invalid_parameters", "num_std_dev must be an integer between 1 and 4"
+            )
+        if self.price_field not in ALLOWED_PRICE_FIELDS:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"price_field must be one of {sorted(ALLOWED_PRICE_FIELDS)}",
+            )
+
+    def to_canonical_dict(self) -> dict[str, object]:
+        return {
+            "period": self.period,
+            "num_std_dev": self.num_std_dev,
+            "price_field": self.price_field,
+        }
+
+    def required_warmup_bars(self) -> int:
+        return self.period
+
+
+StrategyParameters = (
+    SmaCrossoverParameters
+    | RsiThresholdParameters
+    | MacdCrossoverParameters
+    | BollingerBreakoutParameters
+)
+
+_KIND_TO_PARAMETERS_TYPE: dict[str, type] = {
+    "sma_crossover": SmaCrossoverParameters,
+    "rsi_threshold": RsiThresholdParameters,
+    "macd_crossover": MacdCrossoverParameters,
+    "bollinger_breakout": BollingerBreakoutParameters,
+}
+
+
+def build_parameters(kind: str, raw: Mapping[str, object]) -> StrategyParameters:
+    if kind not in SUPPORTED_STRATEGY_KINDS:
+        raise StrategySpecValidationError(
+            "unsupported_kind", f"kind must be one of {sorted(SUPPORTED_STRATEGY_KINDS)}"
+        )
+    parameters_type = _KIND_TO_PARAMETERS_TYPE[kind]
+    try:
+        return parameters_type(**raw)  # type: ignore[no-any-return]
+    except TypeError as exc:
+        raise StrategySpecValidationError(
+            "invalid_parameters", f"parameters do not match kind {kind!r}: {exc}"
+        ) from exc
+
 
 @dataclass(frozen=True, slots=True)
 class SignalPolicy:
@@ -81,7 +222,7 @@ class StrategySpecV1:
     schema_version: int
     name: str
     kind: str
-    parameters: SmaCrossoverParameters
+    parameters: StrategyParameters
     signal_policy: SignalPolicy
     created_at_utc: datetime
     checksum: str
@@ -103,10 +244,16 @@ class StrategySpecV1:
             raise StrategySpecValidationError(
                 "unsupported_kind", f"kind must be one of {sorted(SUPPORTED_STRATEGY_KINDS)}"
             )
-        if self.signal_policy.eligible_after_bars < self.parameters.slow_window:
+        if type(self.parameters) is not _KIND_TO_PARAMETERS_TYPE[self.kind]:
+            raise StrategySpecValidationError(
+                "kind_parameters_mismatch",
+                f"parameters type does not match kind {self.kind!r}",
+            )
+        if self.signal_policy.eligible_after_bars < self.parameters.required_warmup_bars():
             raise StrategySpecValidationError(
                 "invalid_signal_policy",
-                "eligible_after_bars must be greater than or equal to slow_window",
+                "eligible_after_bars must be greater than or equal to the strategy's "
+                "required warm-up bar count",
             )
         if self.created_at_utc.tzinfo is None:
             raise StrategySpecValidationError(

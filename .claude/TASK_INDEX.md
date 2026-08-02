@@ -26,6 +26,7 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-016 | Yahoo Finance market data import | Completed | TASK-004 |
 | TASK-017 | Visual design system and onboarding home page | Completed | TASK-009–TASK-014 |
 | TASK-018 | Remove manual CSV import; Yahoo Finance ticker import only | Completed | TASK-016 |
+| TASK-019 | RSI, MACD, and Bollinger Band strategy kinds | Completed | TASK-006, TASK-007 |
 
 ## Task template
 

@@ -17,7 +17,14 @@ from app.domain.backtest_manifest import (
 )
 from app.domain.execution_result import OrderSide, OrderStatus, TerminalStatus
 from app.domain.market_data import NormalizedBar
-from app.domain.strategy_spec import SignalPolicy, SmaCrossoverParameters, StrategySpecV1
+from app.domain.strategy_spec import (
+    BollingerBreakoutParameters,
+    MacdCrossoverParameters,
+    RsiThresholdParameters,
+    SignalPolicy,
+    SmaCrossoverParameters,
+    StrategySpecV1,
+)
 from app.infrastructure.engine.backtrader_adapter import BacktraderEngineAdapter
 
 BASE = datetime(2026, 1, 1, tzinfo=UTC)
@@ -221,3 +228,74 @@ def test_metadata_records_adapter_and_checksums() -> None:
     assert result.metadata.manifest_checksum == "sha256:manifest"
     assert result.metadata.dataset_checksum == "sha256:bbb"
     assert result.metadata.started_at_utc <= result.metadata.finished_at_utc
+
+
+def test_rsi_threshold_strategy_enters_and_exits_on_a_dip_then_rally_then_fade() -> None:
+    down = [100 - 3 * i for i in range(15)]  # drives RSI into oversold territory
+    up = [down[-1] + 5 * i for i in range(1, 21)]  # bounce: RSI crosses up through oversold,
+    # then keeps climbing into overbought territory
+    fade = [up[-1] - 5 * i for i in range(1, 16)]  # RSI crosses back down through overbought
+    closes = down + up + fade
+    bars = _bars(closes)
+    manifest = _manifest(num_bars=len(closes))
+    strategy = _strategy(
+        name="RSI 5 30/70",
+        kind="rsi_threshold",
+        parameters=RsiThresholdParameters(
+            period=5, oversold_threshold=30, overbought_threshold=70, price_field="close"
+        ),
+        signal_policy=SignalPolicy(signal_time="bar_close", eligible_after_bars=6, long_only=True),
+    )
+
+    result = _run_adapter(bars, manifest, strategy)
+
+    assert result.terminal_status == TerminalStatus.COMPLETED
+    assert len(result.fill_events) >= 1
+    assert result.fill_events[0].side == OrderSide.BUY
+
+
+def test_macd_crossover_strategy_enters_and_exits_on_a_v_shaped_price_path() -> None:
+    # Small `i % 3`/`i % 2` wobble breaks the perfectly linear slope that would otherwise
+    # make the MACD line and its signal line converge to exact equality (no crossing event
+    # is recorded when a line moves from *equal to* -- rather than strictly below -- another).
+    down = [200 - 4 * i - (i % 3) for i in range(15)]
+    up = [down[-1] + 5 * i + (i % 2) for i in range(1, 20)]
+    fade = [up[-1] - 5 * i - (i % 2) for i in range(1, 15)]
+    closes = down + up + fade
+    bars = _bars(closes)
+    manifest = _manifest(num_bars=len(closes))
+    strategy = _strategy(
+        name="MACD 3/6/2",
+        kind="macd_crossover",
+        parameters=MacdCrossoverParameters(
+            fast_period=3, slow_period=6, signal_period=2, price_field="close"
+        ),
+        signal_policy=SignalPolicy(signal_time="bar_close", eligible_after_bars=8, long_only=True),
+    )
+
+    result = _run_adapter(bars, manifest, strategy)
+
+    assert result.terminal_status == TerminalStatus.COMPLETED
+    assert len(result.fill_events) >= 1
+    assert result.fill_events[0].side == OrderSide.BUY
+
+
+def test_bollinger_breakout_strategy_enters_on_breakout_and_exits_on_fade() -> None:
+    flat = [100, 101, 99, 100, 101, 99, 100, 101]
+    breakout = [102, 106, 112, 120, 130]
+    fade = [125, 115, 105, 95, 85, 80]
+    closes = flat + breakout + fade
+    bars = _bars(closes)
+    manifest = _manifest(num_bars=len(closes))
+    strategy = _strategy(
+        name="Bollinger 5/1",
+        kind="bollinger_breakout",
+        parameters=BollingerBreakoutParameters(period=5, num_std_dev=1, price_field="close"),
+        signal_policy=SignalPolicy(signal_time="bar_close", eligible_after_bars=5, long_only=True),
+    )
+
+    result = _run_adapter(bars, manifest, strategy)
+
+    assert result.terminal_status == TerminalStatus.COMPLETED
+    assert len(result.fill_events) >= 1
+    assert result.fill_events[0].side == OrderSide.BUY

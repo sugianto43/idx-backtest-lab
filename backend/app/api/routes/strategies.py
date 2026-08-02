@@ -4,7 +4,6 @@ from app.api.errors import AppError, NotFoundError
 from app.api.schemas.strategies import (
     CreateStrategyRequest,
     SignalPolicySchema,
-    SmaCrossoverParametersSchema,
     StrategySpecListResponse,
     StrategySpecResponse,
 )
@@ -29,11 +28,7 @@ def _spec_response(spec: StrategySpecV1) -> StrategySpecResponse:
         schema_version=spec.schema_version,
         name=spec.name,
         kind=spec.kind,
-        parameters=SmaCrossoverParametersSchema(
-            fast_window=spec.parameters.fast_window,
-            slow_window=spec.parameters.slow_window,
-            price_field=spec.parameters.price_field,  # type: ignore[arg-type]
-        ),
+        parameters=spec.parameters.to_canonical_dict(),
         signal_policy=SignalPolicySchema(
             signal_time=spec.signal_policy.signal_time,  # type: ignore[arg-type]
             eligible_after_bars=spec.signal_policy.eligible_after_bars,
@@ -56,9 +51,7 @@ def create_strategy(
             repository,
             name=payload.name,
             kind=payload.kind,
-            fast_window=payload.parameters.fast_window,
-            slow_window=payload.parameters.slow_window,
-            price_field=payload.parameters.price_field,
+            parameters=payload.parameters,
             signal_time=payload.signal_policy.signal_time,
             eligible_after_bars=payload.signal_policy.eligible_after_bars,
             long_only=payload.signal_policy.long_only,

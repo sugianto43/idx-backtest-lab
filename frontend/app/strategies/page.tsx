@@ -8,7 +8,11 @@ import { ResponsiveTable } from "@/components/data/ResponsiveTable";
 import { EmptyState } from "@/components/status/EmptyState";
 import { ErrorState } from "@/components/status/ErrorState";
 import { LoadingState } from "@/components/status/LoadingState";
-import { fetchStrategies, type StrategySpecListResponse } from "@/lib/api/strategies";
+import {
+  fetchStrategies,
+  summarizeParameters,
+  type StrategySpecListResponse,
+} from "@/lib/api/strategies";
 import type { ApiError } from "@/lib/api/types";
 
 const LIMIT = 20;
@@ -60,7 +64,7 @@ export default function StrategiesPage() {
                 <th scope="col">Name</th>
                 <th scope="col">Kind</th>
                 <th scope="col">Version</th>
-                <th scope="col">Fast / slow window</th>
+                <th scope="col">Parameters</th>
                 <th scope="col">Created</th>
               </tr>
             </thead>
@@ -74,9 +78,7 @@ export default function StrategiesPage() {
                   </th>
                   <td>{strategy.kind}</td>
                   <td>{strategy.version}</td>
-                  <td>
-                    {strategy.parameters.fast_window} / {strategy.parameters.slow_window}
-                  </td>
+                  <td>{summarizeParameters(strategy.kind, strategy.parameters)}</td>
                   <td>{strategy.created_at_utc}</td>
                 </tr>
               ))}

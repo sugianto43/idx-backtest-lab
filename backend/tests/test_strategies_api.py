@@ -85,3 +85,111 @@ def test_list_strategies_paginates(client: TestClient) -> None:
     body = response.json()
     assert body["total"] == 2
     assert len(body["items"]) == 1
+
+
+def test_create_strategy_rejects_unsupported_kind(client: TestClient) -> None:
+    payload = {**VALID_PAYLOAD, "kind": "does_not_exist"}
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"][0]["code"] == "unsupported_kind"
+
+
+def test_create_rsi_threshold_strategy_returns_201(client: TestClient) -> None:
+    payload = {
+        "name": "RSI 14 30/70",
+        "kind": "rsi_threshold",
+        "parameters": {
+            "period": 14,
+            "oversold_threshold": 30,
+            "overbought_threshold": 70,
+            "price_field": "close",
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 15,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["kind"] == "rsi_threshold"
+    assert body["parameters"]["period"] == 14
+
+
+def test_create_rsi_threshold_strategy_rejects_bad_threshold_order(client: TestClient) -> None:
+    payload = {
+        "name": "RSI bad thresholds",
+        "kind": "rsi_threshold",
+        "parameters": {
+            "period": 14,
+            "oversold_threshold": 70,
+            "overbought_threshold": 30,
+            "price_field": "close",
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 15,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_create_macd_crossover_strategy_returns_201(client: TestClient) -> None:
+    payload = {
+        "name": "MACD 12/26/9",
+        "kind": "macd_crossover",
+        "parameters": {
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "price_field": "close",
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 35,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["kind"] == "macd_crossover"
+
+
+def test_create_bollinger_breakout_strategy_returns_201(client: TestClient) -> None:
+    payload = {
+        "name": "Bollinger 20/2",
+        "kind": "bollinger_breakout",
+        "parameters": {"period": 20, "num_std_dev": 2, "price_field": "close"},
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 20,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["kind"] == "bollinger_breakout"
+
+
+def test_create_strategy_rejects_eligible_after_bars_below_warmup(client: TestClient) -> None:
+    payload = {
+        "name": "Bollinger insufficient warm-up",
+        "kind": "bollinger_breakout",
+        "parameters": {"period": 20, "num_std_dev": 2, "price_field": "close"},
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 5,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 422
