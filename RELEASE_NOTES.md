@@ -90,3 +90,10 @@ historical simulation only.
   images confirmed `/runs/new`'s SSR shell renders, and a run created via
   the exact payload the form sends reached `completed` after calling the
   same execute endpoint the detail page's new "Execute run" button uses.
+
+## Verification evidence (TASK-015)
+
+- `.github/workflows/ci.yml` ran on its own pull request (#31) and all
+  three jobs passed: Backend quality gate (1m4s), Frontend quality gate
+  (1m0s), Docker image builds (30s) —
+  https://github.com/sugianto43/idx-backtest-lab/actions/runs/30744892375.

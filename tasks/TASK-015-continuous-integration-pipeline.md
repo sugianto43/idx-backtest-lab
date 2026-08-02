@@ -43,9 +43,9 @@ TASK-001 through TASK-014 must be complete and verified (all are). This task doe
 
 After verification, update project memory/index and record:
 
-- Workflow file and jobs added:
-- CI run evidence (link/status):
-- Deferred follow-up (e.g. branch protection) and why it's out of scope:
+- Workflow file and jobs added: `.github/workflows/ci.yml` — `backend` (ruff format --check, ruff check, mypy, pytest), `frontend` (prettier, eslint, tsc, vitest, next build), `docker` (`docker compose build api web`). Triggers on `push`/`pull_request` to `main`.
+- CI run evidence (link/status): All three jobs passed on PR #31 — backend 1m4s, frontend 1m0s, docker 30s. https://github.com/sugianto43/idx-backtest-lab/actions/runs/30744892375
+- Deferred follow-up (e.g. branch protection) and why it's out of scope: Branch-protection rules requiring this workflow before merge were not configured — that's a GitHub repository-settings change (org/repo admin action), not a file in this codebase, so it's outside this task's scope. Recorded as a known limitation in `RELEASE_NOTES.md`.
 
 ## Next task boundary
 
