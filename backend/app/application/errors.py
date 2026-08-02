@@ -123,3 +123,9 @@ class EngineExecutionError(ApplicationError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+class RunArtifactNotFoundError(ApplicationError):
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"No artifact bundle exists for run: {run_id}")
+        self.run_id = run_id
