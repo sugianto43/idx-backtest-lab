@@ -23,6 +23,7 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-013 | End-to-end quality, documentation, and release readiness | Completed | TASK-001–TASK-012 |
 | TASK-014 | Backtest run creation and execution UX | Completed | TASK-006, TASK-009, TASK-010, TASK-011 |
 | TASK-015 | Continuous integration pipeline | Completed | TASK-001–TASK-014 |
+| TASK-016 | Yahoo Finance market data import | Completed | TASK-004 |
 
 ## Task template
 

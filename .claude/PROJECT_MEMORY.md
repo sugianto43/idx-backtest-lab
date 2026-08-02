@@ -2,7 +2,7 @@
 
 ## Status
 
-All planned tasks (`TASK-001` through `TASK-015`) are implemented and verified; see `RELEASE_NOTES.md` at the repository root for the exact v1 scope and known limitations. `TASK-001` established the foundation:
+All planned tasks (`TASK-001` through `TASK-016`) are implemented and verified; see `RELEASE_NOTES.md` at the repository root for the exact v1 scope and known limitations. `TASK-001` established the foundation:
 
 - Backend: FastAPI on Python 3.13, dependency-free `GET /health` returning `{"status":"ok"}`. Quality tooling: `ruff` (format + lint), `mypy --strict`, `pytest` (with `httpx` for `TestClient`). Direct dependencies pinned in `backend/requirements.txt` / `backend/requirements-dev.txt`.
 - Frontend: Next.js 16.2.12 (App Router) + React 19.2.4 + strict TypeScript, minimal accessible landing page at `/`. Quality tooling: ESLint (`eslint-config-next` + `eslint-config-prettier`), Prettier, `tsc --noEmit`, Vitest + Testing Library.
@@ -43,6 +43,8 @@ Frontend (`lib/api/optimizations.ts`, `app/optimizations/{page,new/page,[optimiz
 
 `TASK-015` is implemented and verified. `.github/workflows/ci.yml` runs three jobs (backend quality gate, frontend quality gate, `docker compose build api web`) on every push/PR to `main`, using Python 3.13 and Node 22 to match the Dockerfiles exactly. It automates only the commands already documented in root `README.md`'s quality-gate table — no command, dependency, or product behavior changed. Acceptance evidence is the workflow's own run on its PR (#31): all three jobs passed (backend 1m4s, frontend 1m0s, docker 30s) — https://github.com/sugianto43/idx-backtest-lab/actions/runs/30744892375. Branch-protection rules requiring this workflow before merge were deliberately not configured — that is a GitHub repository-settings change, not a codebase change, and out of this task's file-based scope; documented as a deferred follow-up in `RELEASE_NOTES.md`.
 
+`TASK-016` is implemented and verified, closing the "no market-data provider" limitation per the user's explicit choice of Yahoo Finance and formalized in ADR-010. `app/infrastructure/market_data/yahoo_finance_provider.py::fetch_daily_ohlcv_csv` fetches Yahoo's public chart JSON endpoint (`query1.finance.yahoo.com`) using only the Python standard library (`urllib.request`, `json` — no `yfinance`, no pandas/numpy, no new dependency at all) and converts it into exact `CSV_INGESTION_CONTRACT.md` bytes; rows with any `null` OHLCV field (Yahoo's placeholder for non-trading timestamps) are skipped rather than fabricated. `POST /api/v1/datasets:import-from-yahoo-finance` is a thin translation layer that builds this CSV then calls the *same* `ImportDatasetUseCase.execute()` the manual-upload endpoint uses — `_import_response_or_raise()` was factored out of `import_dataset` so both endpoints share one response-building path, and no new validation/persistence logic exists. `source_name` (`"Yahoo Finance"`), `license_reference` (a fixed personal/non-commercial ToS citation), and `adjustment_policy` (`split_adjusted` — Yahoo's plain `close` is split- but not dividend-adjusted, deliberately not `Adj Close`/`total_return_adjusted`) are hardcoded in the route, never caller-editable, since the true values are already known for this specific source. A fetch failure or empty result is `502 upstream_fetch_failed`, never a partial/fabricated dataset. Verified with a **real live network call** in the Docker smoke test (not mocked): fetched genuine AAPL daily bars for 2026-01-01–01-10 and got 6 real trading-day bars back with correct provenance — the only task so far whose smoke test hit a real external service rather than only the local stack. Per ADR-010, this integration must never be the basis for a hosted/commercial deployment without a real Yahoo licensing review; that constraint is recorded in `RELEASE_NOTES.md` as a hard limitation, not a soft preference.
+
 ## Confirmed decisions
 
 | Decision | Status | Source |
@@ -52,10 +54,10 @@ Frontend (`lib/api/optimizations.ts`, `app/optimizations/{page,new/page,[optimiz
 | Backtest runs must be reproducible and immutable | Confirmed | Constitution |
 | Financial correctness outranks convenience | Confirmed | Constitution |
 | Initial technology boundaries are FastAPI, Next.js, DuckDB, Docker Compose, and a Backtrader adapter | Accepted | ADR-001 |
+| First market-data provider is Yahoo Finance's public chart endpoint, personal/non-commercial use only, mapped through the existing CSV ingestion contract | Accepted | ADR-010 |
 
 ## Open decisions
 
-- Historical data provider(s), licensing, source-of-truth policy, and refresh cadence.
 - Adjustment policy for splits, dividends, rights issues, ticker changes, delistings, and suspensions.
 - Exchange calendar, time-zone representation, and handling of special trading sessions.
 - Exact transaction-cost, tax, slippage, liquidity, and price-limit models.

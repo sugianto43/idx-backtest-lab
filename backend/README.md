@@ -139,8 +139,23 @@ violation. `GET /api/v1/datasets/{dataset_id}` and `GET /api/v1/datasets`
 expose provenance, validation status, and warnings — never raw bars or files.
 Both also expose `row_count`/`warning_count` (sourced from the dataset's
 latest import record) so the frontend dashboard can render them without a
-detail call per row. No market-data provider, corporate-action, or
-ticker-resolution logic exists here; see TASK-005.
+detail call per row. No corporate-action or ticker-resolution logic exists
+here; see TASK-005.
+
+`POST /api/v1/datasets:import-from-yahoo-finance` (JSON: `ticker`,
+`instrument_identifier` optional, `start_date`, `end_date`, `name`,
+`instrument_mapping_policy`, `allow_reimport` optional) is the one market-
+data provider adapter that exists (ADR-010): it fetches daily OHLCV from
+Yahoo Finance's public chart endpoint using only the standard library (no
+new dependency), converts it into exact `CSV_INGESTION_CONTRACT.md` bytes,
+and calls the *same* import use case `POST /api/v1/datasets:import` uses —
+no separate validation path. `source_name` (`"Yahoo Finance"`),
+`license_reference` (a fixed citation of Yahoo's Terms of Service —
+personal, non-commercial use only, redistribution prohibited), and
+`adjustment_policy` (`split_adjusted`, since Yahoo's `close` is split- but
+not dividend-adjusted) are fixed by this endpoint, never caller-supplied. A
+Yahoo fetch failure or an empty result returns `502 upstream_fetch_failed`
+— never a fabricated or partial dataset.
 
 ## Configuration
 

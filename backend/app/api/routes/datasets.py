@@ -7,10 +7,12 @@ from app.api.schemas.datasets import (
     DatasetListResponse,
     DatasetSummary,
     DatasetWarning,
+    ImportFromYahooFinanceRequest,
 )
 from app.application.dataset_import_service import ImportDatasetRequest, ImportDatasetUseCase
 from app.application.errors import DatasetReimportConflictError
 from app.domain.dataset import DatasetValidationStatus, InstrumentMappingPolicy
+from app.domain.market_data import DatasetImport
 from app.infrastructure.db.dataset_import_repository import DuckDBDatasetImportRepository
 from app.infrastructure.db.dataset_import_writer import DuckDBDatasetImportWriter
 from app.infrastructure.db.dataset_repository import DuckDBDatasetRepository
@@ -18,6 +20,13 @@ from app.infrastructure.db.dataset_validation_event_repository import (
     DuckDBDatasetValidationEventRepository,
 )
 from app.infrastructure.ingestion.csv_parser import DelimitedCsvParser
+from app.infrastructure.market_data.yahoo_finance_provider import (
+    YAHOO_FINANCE_ADJUSTMENT_POLICY,
+    YAHOO_FINANCE_LICENSE_REFERENCE,
+    YAHOO_FINANCE_SOURCE_NAME,
+    YahooFinanceFetchError,
+    fetch_daily_ohlcv_csv,
+)
 from app.infrastructure.settings import Settings, get_settings
 
 v1_datasets_router = APIRouter(prefix="/api/v1")
@@ -41,6 +50,12 @@ class DatasetConflictError(AppError):
     message = "An identical dataset has already been imported."
 
 
+class YahooFinanceFetchHttpError(AppError):
+    code = "upstream_fetch_failed"
+    status_code = status.HTTP_502_BAD_GATEWAY
+    message = "Could not fetch data from Yahoo Finance."
+
+
 def _build_use_case(settings: Settings) -> ImportDatasetUseCase:
     return ImportDatasetUseCase(
         import_repository=DuckDBDatasetImportRepository(settings),
@@ -51,6 +66,29 @@ def _build_use_case(settings: Settings) -> ImportDatasetUseCase:
 
 def _get_use_case(settings: Settings = Depends(get_settings)) -> ImportDatasetUseCase:
     return _build_use_case(settings)
+
+
+def _import_response_or_raise(result: DatasetImport) -> DatasetImportResponse:
+    if result.status == DatasetValidationStatus.REJECTED:
+        raise DatasetImportRejectedError(
+            details=[
+                {
+                    "code": result.failure_code,
+                    "row_number": result.failure_row_number,
+                }
+            ]
+        )
+
+    return DatasetImportResponse(
+        import_id=result.import_id,
+        dataset_id=result.dataset_id,
+        status=result.status.value,  # type: ignore[arg-type]
+        row_count=result.row_count,
+        accepted_row_count=result.accepted_row_count,
+        warning_count=result.warning_count,
+        started_at_utc=result.started_at_utc,
+        finished_at_utc=result.finished_at_utc,
+    )
 
 
 @v1_datasets_router.post(
@@ -97,26 +135,52 @@ def import_dataset(
             details=[{"existing_dataset_id": exc.existing_dataset_id}]
         ) from exc
 
-    if result.status == DatasetValidationStatus.REJECTED:
-        raise DatasetImportRejectedError(
-            details=[
-                {
-                    "code": result.failure_code,
-                    "row_number": result.failure_row_number,
-                }
-            ]
-        )
+    return _import_response_or_raise(result)
 
-    return DatasetImportResponse(
-        import_id=result.import_id,
-        dataset_id=result.dataset_id,
-        status=result.status.value,  # type: ignore[arg-type]
-        row_count=result.row_count,
-        accepted_row_count=result.accepted_row_count,
-        warning_count=result.warning_count,
-        started_at_utc=result.started_at_utc,
-        finished_at_utc=result.finished_at_utc,
-    )
+
+@v1_datasets_router.post(
+    "/datasets:import-from-yahoo-finance",
+    response_model=DatasetImportResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def import_dataset_from_yahoo_finance(
+    payload: ImportFromYahooFinanceRequest,
+    use_case: ImportDatasetUseCase = Depends(_get_use_case),
+) -> DatasetImportResponse:
+    try:
+        csv_bytes = fetch_daily_ohlcv_csv(
+            payload.ticker,
+            payload.instrument_identifier or payload.ticker,
+            payload.start_date,
+            payload.end_date,
+        )
+    except YahooFinanceFetchError as exc:
+        raise YahooFinanceFetchHttpError(
+            details=[{"code": exc.code, "message": exc.message}]
+        ) from exc
+
+    try:
+        result = use_case.execute(
+            ImportDatasetRequest(
+                raw_bytes=csv_bytes,
+                filename=f"{payload.ticker}.csv",
+                name=payload.name,
+                source_name=YAHOO_FINANCE_SOURCE_NAME,
+                license_reference=YAHOO_FINANCE_LICENSE_REFERENCE,
+                bar_interval="1d",
+                timezone="UTC",
+                adjustment_policy=YAHOO_FINANCE_ADJUSTMENT_POLICY,
+                instrument_mapping_policy=payload.instrument_mapping_policy,
+                source_reference=f"ticker={payload.ticker}",
+                allow_reimport=payload.allow_reimport,
+            )
+        )
+    except DatasetReimportConflictError as exc:
+        raise DatasetConflictError(
+            details=[{"existing_dataset_id": exc.existing_dataset_id}]
+        ) from exc
+
+    return _import_response_or_raise(result)
 
 
 @v1_datasets_router.get("/datasets/{dataset_id}", response_model=DatasetDetailResponse)

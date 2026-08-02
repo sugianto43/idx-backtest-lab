@@ -17,6 +17,16 @@ class DatasetImportResponse(BaseModel):
     finished_at_utc: datetime
 
 
+class ImportFromYahooFinanceRequest(BaseModel):
+    ticker: str
+    instrument_identifier: str | None = None
+    start_date: date
+    end_date: date
+    name: str
+    instrument_mapping_policy: InstrumentMappingPolicy
+    allow_reimport: bool = False
+
+
 class DatasetWarning(BaseModel):
     code: str
     message: str

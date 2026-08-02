@@ -140,3 +140,92 @@ def test_list_datasets_includes_row_and_warning_counts(client: TestClient) -> No
     item = next(i for i in response.json()["items"] if i["dataset_id"] == imported["dataset_id"])
     assert item["row_count"] == imported["accepted_row_count"]
     assert item["warning_count"] == imported["warning_count"]
+
+
+def test_import_from_yahoo_finance_creates_dataset_with_fixed_provenance(
+    client: TestClient, monkeypatch: Any
+) -> None:
+    from app.api.routes import datasets as datasets_route
+
+    def fake_fetch(ticker: str, instrument_identifier: str, start: Any, end: Any) -> bytes:
+        assert ticker == "BBCA.JK"
+        assert instrument_identifier == "BBCA"
+        return VALID_CSV
+
+    monkeypatch.setattr(datasets_route, "fetch_daily_ohlcv_csv", fake_fetch)
+
+    response = client.post(
+        "/api/v1/datasets:import-from-yahoo-finance",
+        json={
+            "ticker": "BBCA.JK",
+            "instrument_identifier": "BBCA",
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-02",
+            "name": "BBCA from Yahoo Finance",
+            "instrument_mapping_policy": "ticker_as_of_import",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "valid"
+    assert body["dataset_id"] is not None
+
+    detail = client.get(f"/api/v1/datasets/{body['dataset_id']}")
+    assert detail.status_code == 200
+    detail_body = detail.json()
+    assert detail_body["source_name"] == "Yahoo Finance"
+    assert "non-commercial" in detail_body["license_reference"]
+    assert detail_body["adjustment_policy"] == "split_adjusted"
+
+
+def test_import_from_yahoo_finance_fetch_failure_returns_502(
+    client: TestClient, monkeypatch: Any
+) -> None:
+    from app.api.routes import datasets as datasets_route
+    from app.infrastructure.market_data.yahoo_finance_provider import YahooFinanceFetchError
+
+    def failing_fetch(ticker: str, instrument_identifier: str, start: Any, end: Any) -> bytes:
+        raise YahooFinanceFetchError("no_data", "Yahoo Finance returned no trading bars.")
+
+    monkeypatch.setattr(datasets_route, "fetch_daily_ohlcv_csv", failing_fetch)
+
+    response = client.post(
+        "/api/v1/datasets:import-from-yahoo-finance",
+        json={
+            "ticker": "DOESNOTEXIST",
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-02",
+            "name": "Unknown ticker",
+            "instrument_mapping_policy": "ticker_as_of_import",
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "upstream_fetch_failed"
+    assert response.json()["error"]["details"][0]["code"] == "no_data"
+
+
+def test_import_from_yahoo_finance_duplicate_without_allow_reimport_returns_409(
+    client: TestClient, monkeypatch: Any
+) -> None:
+    from app.api.routes import datasets as datasets_route
+
+    monkeypatch.setattr(
+        datasets_route,
+        "fetch_daily_ohlcv_csv",
+        lambda ticker, instrument_identifier, start, end: VALID_CSV,
+    )
+
+    payload = {
+        "ticker": "BBCA.JK",
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-02",
+        "name": "BBCA from Yahoo Finance",
+        "instrument_mapping_policy": "ticker_as_of_import",
+    }
+    first = client.post("/api/v1/datasets:import-from-yahoo-finance", json=payload)
+    assert first.status_code == 201
+
+    second = client.post("/api/v1/datasets:import-from-yahoo-finance", json=payload)
+    assert second.status_code == 409

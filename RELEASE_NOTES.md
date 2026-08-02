@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-015)
+# Release Notes — v1 (TASK-001 through TASK-016)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -50,8 +50,14 @@ historical simulation only.
   cross-validation shuffle; no multi-objective scoring. Objective ranking
   is always "highest value wins" — there is no minimize direction, because
   every v1 metric is already oriented so a higher value is better.
-- **No market-data provider integration.** Only manual, offline CSV
-  import exists; no live or historical data feed is connected.
+- **One market-data provider: Yahoo Finance, personal use only.**
+  `POST /api/v1/datasets:import-from-yahoo-finance` (ADR-010) fetches daily
+  OHLCV via Yahoo's public, unofficial chart endpoint. Yahoo's Terms of
+  Service permit personal, non-commercial use only and prohibit
+  redistribution — this tool must never be deployed as a hosted,
+  multi-tenant, or commercial service on top of this adapter without a
+  real licensing review. Manual CSV import remains fully supported for any
+  other source.
 - **No authentication or multi-user support.** Anyone with network access
   to the API can perform every operation. This is a local single-user
   research tool, not a hosted service.
@@ -97,3 +103,15 @@ historical simulation only.
   three jobs passed: Backend quality gate (1m4s), Frontend quality gate
   (1m0s), Docker image builds (30s) —
   https://github.com/sugianto43/idx-backtest-lab/actions/runs/30744892375.
+
+## Verification evidence (TASK-016)
+
+- Backend: `ruff format --check .`, `ruff check .`, `mypy .`, `pytest -q`
+  — all clean, 289 tests passed (9 new: CSV-conversion unit tests with a
+  mocked fetch function, plus API tests for success/fetch-failure/
+  duplicate-conflict, all offline).
+- `docker compose build api` succeeds; a live smoke test against the
+  running container made a real network call to Yahoo Finance for `AAPL`
+  and correctly imported 6 real trading bars with fixed provenance
+  (`source_name="Yahoo Finance"`, the personal/non-commercial license
+  citation, `adjustment_policy="split_adjusted"`) — not a mocked response.
