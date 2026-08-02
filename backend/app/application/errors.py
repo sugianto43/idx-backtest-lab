@@ -88,3 +88,38 @@ class StrategySpecNotFoundError(ApplicationError):
         super().__init__(f"Strategy spec not found: {strategy_id}@{version}")
         self.strategy_id = strategy_id
         self.version = version
+
+
+class BacktestRunNotEligibleError(ApplicationError):
+    def __init__(self, run_id: str, status: str) -> None:
+        super().__init__(f"Backtest run {run_id} is not eligible to execute (status={status})")
+        self.run_id = run_id
+        self.status = status
+
+
+class UnsupportedMultiInstrumentError(ApplicationError):
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"Run {run_id} declares more than one instrument; unsupported in v1")
+        self.run_id = run_id
+
+
+class UnresolvedInstrumentMappingError(ApplicationError):
+    def __init__(self, dataset_id: str, instrument_id: str) -> None:
+        super().__init__(
+            f"No dataset-instrument mapping resolves {instrument_id} in dataset {dataset_id} "
+            "for the requested period"
+        )
+        self.dataset_id = dataset_id
+        self.instrument_id = instrument_id
+
+
+class EmptyBarSnapshotError(ApplicationError):
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"No bars are available for run {run_id} within its declared period")
+        self.run_id = run_id
+
+
+class EngineExecutionError(ApplicationError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code

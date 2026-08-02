@@ -38,3 +38,19 @@ class BacktestRunListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ExecuteBacktestRunResponse(BaseModel):
+    run_id: str
+    status: str
+    terminal_status: str
+    failure_code: str | None
+    order_count: int
+    fill_count: int
+    position_count: int
+    cash_event_count: int
+    warning_count: int
+    note: str = (
+        "This is an interim execution summary. Durable, retrievable result artifacts "
+        "and metrics are introduced in a later task."
+    )

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 RUN_MANIFEST_SCHEMA_VERSION = 1
 CORPORATE_ACTION_TREATMENT = "dataset_as_declared_no_event_adjustment"
@@ -361,3 +362,62 @@ class RunManifestV1:
             "engine_ref": self.engine_ref.to_canonical_dict(),
             "created_at_utc": _format_utc(self.created_at_utc),
         }
+
+
+def _parse_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def parse_run_manifest(data: dict[str, Any]) -> RunManifestV1:
+    strategy_ref_data = data["strategy_ref"]
+    dataset_ref_data = data["dataset_ref"]
+    universe_data = data["universe"]
+    period_data = data["period"]
+    capital_data = data["capital"]
+    signal_and_fill_data = data["signal_and_fill"]
+    execution_data = data["execution"]
+    metrics_data = data["metrics"]
+    engine_ref_data = data["engine_ref"]
+    position_sizing_data = execution_data["position_sizing"]
+    rounding_data = execution_data["rounding"]
+
+    return RunManifestV1(
+        run_id=data["run_id"],
+        schema_version=data["schema_version"],
+        strategy_ref=StrategyRef(**strategy_ref_data),
+        dataset_ref=DatasetRef(**dataset_ref_data),
+        universe=Universe(
+            instrument_ids=tuple(universe_data["instrument_ids"]),
+            unresolved_identifier_policy=universe_data["unresolved_identifier_policy"],
+        ),
+        period=Period(
+            start_date=date.fromisoformat(period_data["start_date"]),
+            end_date=date.fromisoformat(period_data["end_date"]),
+            bar_interval=period_data["bar_interval"],
+        ),
+        capital=Capital(amount=Decimal(capital_data["amount"]), currency=capital_data["currency"]),
+        signal_and_fill=SignalAndFill(**signal_and_fill_data),
+        corporate_action_treatment=data["corporate_action_treatment"],
+        execution=Execution(
+            position_sizing=PositionSizing(
+                fraction=Decimal(position_sizing_data["fraction"]),
+                kind=position_sizing_data["kind"],
+            ),
+            commission=KindSetting(**execution_data["commission"]),
+            tax=KindSetting(**execution_data["tax"]),
+            slippage=KindSetting(**execution_data["slippage"]),
+            liquidity=KindSetting(**execution_data["liquidity"]),
+            price_limit=KindSetting(**execution_data["price_limit"]),
+            rounding=Rounding(
+                quantity_increment=Decimal(rounding_data["quantity_increment"]),
+                money_scale=rounding_data["money_scale"],
+            ),
+        ),
+        benchmark=KindSetting(**data["benchmark"]),
+        metrics=Metrics(
+            annualization_basis=metrics_data["annualization_basis"],
+            risk_free_rate=Decimal(metrics_data["risk_free_rate"]),
+        ),
+        engine_ref=EngineRef(**engine_ref_data),
+        created_at_utc=_parse_utc(data["created_at_utc"]),
+    )

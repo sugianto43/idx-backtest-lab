@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -7,6 +8,7 @@ from app.api.schemas.backtest_runs import (
     BacktestRunListResponse,
     BacktestRunResponse,
     CreateBacktestRunRequest,
+    ExecuteBacktestRunResponse,
 )
 from app.application.backtest_run_manifest_service import (
     CreateRunManifestRequest,
@@ -14,16 +16,25 @@ from app.application.backtest_run_manifest_service import (
     create_run_manifest,
 )
 from app.application.errors import (
+    BacktestRunNotEligibleError,
+    BacktestRunNotFoundError,
     DatasetNotFoundError,
+    EmptyBarSnapshotError,
+    EngineExecutionError,
     InstrumentNotFoundError,
     StrategySpecNotFoundError,
+    UnresolvedInstrumentMappingError,
+    UnsupportedMultiInstrumentError,
 )
+from app.application.execute_backtest_run_service import execute_backtest_run
 from app.domain.backtest_manifest import RunManifestValidationError
 from app.domain.backtest_run import RunManifest
 from app.infrastructure.db.backtest_run_repository import DuckDBBacktestRunRepository
+from app.infrastructure.db.bar_snapshot_repository import DuckDBBarSnapshotRepository
 from app.infrastructure.db.dataset_repository import DuckDBDatasetRepository
 from app.infrastructure.db.instrument_repository import DuckDBInstrumentRepository
 from app.infrastructure.db.strategy_spec_repository import DuckDBStrategySpecRepository
+from app.infrastructure.engine.backtrader_adapter import BacktraderEngineAdapter
 from app.infrastructure.settings import Settings, get_settings
 
 v1_backtest_runs_router = APIRouter(prefix="/api/v1")
@@ -33,6 +44,18 @@ class RunManifestValidationHttpError(AppError):
     code = "validation_error"
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     message = "The run manifest is invalid."
+
+
+class RunNotEligibleError(AppError):
+    code = "conflict"
+    status_code = status.HTTP_409_CONFLICT
+    message = "The run is not eligible to execute in its current status."
+
+
+class RunExecutionRejectedError(AppError):
+    code = "validation_error"
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    message = "The run could not be executed."
 
 
 def _run_response(run: RunManifest) -> BacktestRunResponse:
@@ -109,3 +132,47 @@ def get_backtest_run(
     if run is None:
         raise NotFoundError()
     return _run_response(run)
+
+
+@v1_backtest_runs_router.post(
+    "/backtest-runs/{run_id}:execute", response_model=ExecuteBacktestRunResponse
+)
+def execute_backtest_run_endpoint(
+    run_id: str, settings: Settings = Depends(get_settings)
+) -> ExecuteBacktestRunResponse:
+    try:
+        result = execute_backtest_run(
+            DuckDBBacktestRunRepository(settings),
+            DuckDBStrategySpecRepository(settings),
+            DuckDBBarSnapshotRepository(settings),
+            BacktraderEngineAdapter(),
+            run_id,
+            id_factory=lambda: uuid.uuid4().hex,
+        )
+    except (BacktestRunNotFoundError, StrategySpecNotFoundError) as exc:
+        raise NotFoundError() from exc
+    except BacktestRunNotEligibleError as exc:
+        raise RunNotEligibleError(details=[{"status": exc.status}]) from exc
+    except (
+        UnsupportedMultiInstrumentError,
+        UnresolvedInstrumentMappingError,
+        EmptyBarSnapshotError,
+    ) as exc:
+        raise RunExecutionRejectedError(details=[{"message": str(exc)}]) from exc
+    except EngineExecutionError as exc:
+        raise AppError(details=[{"code": exc.code, "message": str(exc)}]) from exc
+
+    run = DuckDBBacktestRunRepository(settings).get(run_id)
+    status_value = run.status.value if run is not None else "unknown"
+
+    return ExecuteBacktestRunResponse(
+        run_id=run_id,
+        status=status_value,
+        terminal_status=result.terminal_status.value,
+        failure_code=result.failure_code,
+        order_count=len(result.order_events),
+        fill_count=len(result.fill_events),
+        position_count=len(result.position_events),
+        cash_event_count=len(result.cash_events),
+        warning_count=len(result.warnings),
+    )

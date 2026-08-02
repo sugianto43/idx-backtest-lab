@@ -13,7 +13,9 @@ class BacktestRunStatus(StrEnum):
 
 
 _ALLOWED_TRANSITIONS: dict[BacktestRunStatus, frozenset[BacktestRunStatus]] = {
-    BacktestRunStatus.CREATED: frozenset({BacktestRunStatus.RUNNING, BacktestRunStatus.CANCELLED}),
+    BacktestRunStatus.CREATED: frozenset(
+        {BacktestRunStatus.RUNNING, BacktestRunStatus.CANCELLED, BacktestRunStatus.FAILED}
+    ),
     BacktestRunStatus.RUNNING: frozenset({BacktestRunStatus.COMPLETED, BacktestRunStatus.FAILED}),
     BacktestRunStatus.COMPLETED: frozenset(),
     BacktestRunStatus.FAILED: frozenset(),
