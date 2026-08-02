@@ -56,11 +56,11 @@ TASK-006, TASK-009, and TASK-010 must be complete and verified. The backend stra
 
 After verification, update project memory/index and record:
 
-- Routes/components/API calls:
-- Client validation and backend-error behavior:
-- Accessibility/responsive evidence:
-- Commands/tests and results:
-- Explicitly deferred run creation/strategy capabilities:
+- Routes/components/API calls: `/strategies` (list, `GET /api/v1/strategies`), `/strategies/new` (`POST /api/v1/strategies`), `/strategies/{strategy_id}/versions/{version}` (`GET /api/v1/strategies/{id}/versions/{version}`). `lib/api/strategies.ts` (typed models + calls), reuses `components/data/{ProvenanceList,PaginationControls,ResponsiveTable}` and `components/status/*` from TASK-009/010. No backend changes — the existing TASK-006 endpoints already matched the UX contract's routes and fields.
+- Client validation and backend-error behavior: Name required; fast/slow window inputs are `type="text"`/`inputMode="numeric"` validated against `/^[1-9]\d*$/` (rejects decimals, scientific notation, leading zeros, non-digits) before parsing to a JS number via `Number.isSafeInteger`; `fast_window < slow_window` checked client-side. All checks block submission before any network call and are explicitly convenience-only. A server rejection preserves every entered field (React state untouched on error) and renders via the shared `ErrorState` (safe message + code + correlation ID).
+- Accessibility/responsive evidence: One `<h1>` per route; form inputs have `<label htmlFor>` and `aria-describedby` help text; the fixed signal-policy fields are presented in a `<fieldset>`/`<legend>` as read-only text, never as editable controls; the detail route has zero `<input>`/`<button>` elements (verified by test). Reuses TASK-010's `.responsive-table`/`.id-value` CSS for the list table and checksum display. No automated viewport test (jsdom does not lay out CSS), consistent with prior tasks — verified by SSR HTML inspection via `curl` against a `docker run` container instead.
+- Commands/tests and results: Backend — unchanged, `pytest -q` → 245 passed (no backend files touched). Frontend — `npm run format`/`lint`/`type-check` clean, `npm run test` → 70 passed across 19 files (+14 for this task), `npm run build` succeeds (10 routes). `docker compose build web` succeeds; a live two-container smoke test created a real strategy via `curl` against the API container and confirmed `/strategies`, `/strategies/new`, and `/strategies/{id}/versions/{version}` all render their correct SSR shell (list heading, create-form heading, and the version-detail page's initial loading state) against a live backend.
+- Explicitly deferred run creation/strategy capabilities: No strategy edit/delete/clone (immutable-only, matches contract). No new-run form or execute trigger from a strategy detail page (still TASK-006/007/008's API-only surface). No signal preview, indicator chart, or historical-data fetch — the detail page only echoes the backend-returned specification and static plain-language semantics text.
 
 ## Next task boundary
 

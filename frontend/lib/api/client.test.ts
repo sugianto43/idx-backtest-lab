@@ -156,6 +156,30 @@ describe("apiFetch", () => {
     });
   });
 
+  it("sends a POST with a JSON body and Content-Type header", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ strategy_id: "strat-1" }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await apiFetch("/api/v1/strategies", {
+      method: "POST",
+      json: { name: "Test" },
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:8000/api/v1/strategies",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "Test" }),
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      data: { strategy_id: "strat-1" },
+      correlationId: undefined,
+    });
+  });
+
   it("normalizes an undocumented error body as malformed_response", async () => {
     vi.stubGlobal(
       "fetch",

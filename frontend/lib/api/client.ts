@@ -23,6 +23,7 @@ export interface ApiFetchOptions {
   signal?: AbortSignal;
   method?: "GET" | "POST";
   body?: FormData;
+  json?: unknown;
 }
 
 /**
@@ -43,12 +44,19 @@ export async function apiFetch<T>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   options.signal?.addEventListener("abort", () => controller.abort());
 
+  const headers: Record<string, string> = { Accept: "application/json" };
+  let requestBody: BodyInit | undefined = options.body;
+  if (options.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    requestBody = JSON.stringify(options.json);
+  }
+
   let response: Response;
   try {
     response = await fetch(`${config.baseUrl}${path}`, {
       method: options.method ?? "GET",
-      headers: { Accept: "application/json" },
-      body: options.body,
+      headers,
+      body: requestBody,
       signal: controller.signal,
     });
   } catch (cause) {
