@@ -15,7 +15,10 @@ optimization workflow (`/optimizations`, `/optimizations/new`,
 `/optimizations/[optimization_id]`) for the backend's chronological
 train/validation/holdout parameter optimizer. TASK-014 adds `/runs/new` and
 an "Execute run" action on `/runs/{run_id}`, so backtest runs no longer
-require a direct API call to create or execute.
+require a direct API call to create or execute. TASK-017 adds the design
+system (`app/globals.css`: color/spacing/radius tokens, styled buttons,
+inputs, cards, tables, nav) and redesigns `/` into a guided "Getting
+started" onboarding page.
 
 ## Prerequisites
 
@@ -86,6 +89,18 @@ field, and only shows holdout run ID/objective once the backend itself
 reports the optimization `completed`. Rejected candidate pairs surface as an
 always-visible warning banner, not a collapsed count. The candidates table
 never requests more than one page at a time and never shows holdout data.
+
+## Design system
+
+`app/globals.css` defines the app's only styling — CSS custom properties
+for color/spacing/radius (light and dark via `prefers-color-scheme`), and
+rules targeting existing semantic HTML (`button`, `input`, `fieldset`,
+`table`, nav links, `.card`) rather than per-component classes, so styling
+changes never require touching a page's markup or its tests. `/` is a
+static server component (no client fetch) presenting a numbered "Getting
+started" flow linking directly to each creation route
+(`/datasets/import`, `/strategies/new`, `/runs/new`,
+`/optimizations/new`) plus a compact link grid to every list page.
 
 ## Run the app
 
