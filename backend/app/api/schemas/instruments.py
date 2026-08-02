@@ -91,6 +91,10 @@ class MappingResponse(BaseModel):
     created_at_utc: datetime
 
 
+class DatasetMappingListResponse(BaseModel):
+    items: list[MappingResponse]
+
+
 class RecordCorporateActionRequest(BaseModel):
     event_type: CorporateActionType
     effective_date: date

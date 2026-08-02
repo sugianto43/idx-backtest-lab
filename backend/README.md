@@ -122,7 +122,9 @@ Instruments have a stable opaque `instrument_id`; tickers are effective-dated
 aliases (`POST /api/v1/instruments/{id}/aliases`), never primary keys. A
 dataset's raw `source_instrument_identifier` (from TASK-004) resolves to an
 instrument only for a declared date range via
-`POST /api/v1/datasets/{dataset_id}/instrument-mappings`. Corporate actions
+`POST /api/v1/datasets/{dataset_id}/instrument-mappings` (listable via the
+matching `GET`, used by the frontend's instrument picker on `/runs/new` and
+`/optimizations/new`). Corporate actions
 (`POST /api/v1/instruments/{id}/corporate-actions`) are immutable evidence
 records only — no price/share adjustment is calculated anywhere in this
 codebase. Overlapping aliases/mappings for the same symbol or source

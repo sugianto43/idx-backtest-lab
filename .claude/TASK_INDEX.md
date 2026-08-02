@@ -28,6 +28,7 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-018 | Remove manual CSV import; Yahoo Finance ticker import only | Completed | TASK-016 |
 | TASK-019 | RSI, MACD, and Bollinger Band strategy kinds | Completed | TASK-006, TASK-007 |
 | TASK-020 | Custom multi-indicator combination strategy kind | Completed | TASK-019 |
+| TASK-021 | Picker-based creation UX for runs and optimizations | Completed | TASK-010, TASK-012, TASK-014 |
 
 ## Task template
 
