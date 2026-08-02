@@ -10,6 +10,7 @@ from app.api.schemas.instruments import (
     CorporateActionResponse,
     CreateInstrumentRequest,
     CreateMappingRequest,
+    DatasetMappingListResponse,
     InstrumentDetailResponse,
     InstrumentListResponse,
     InstrumentResponse,
@@ -28,7 +29,7 @@ from app.application.errors import (
 )
 from app.application.instrument_service import add_instrument_alias, create_instrument
 from app.domain.corporate_action import CorporateAction
-from app.domain.instrument import Instrument, InstrumentAlias
+from app.domain.instrument import DatasetInstrumentMapping, Instrument, InstrumentAlias
 from app.infrastructure.db.corporate_action_repository import DuckDBCorporateActionRepository
 from app.infrastructure.db.dataset_instrument_mapping_repository import (
     DuckDBDatasetInstrumentMappingRepository,
@@ -72,6 +73,20 @@ def _alias_response(alias: InstrumentAlias) -> AliasResponse:
         source_reference=alias.source_reference,
         confidence=alias.confidence,
         created_at_utc=alias.created_at_utc,
+    )
+
+
+def _mapping_response(mapping: DatasetInstrumentMapping) -> MappingResponse:
+    return MappingResponse(
+        mapping_id=mapping.mapping_id,
+        dataset_id=mapping.dataset_id,
+        source_instrument_identifier=mapping.source_instrument_identifier,
+        instrument_id=mapping.instrument_id,
+        effective_from=mapping.effective_from,
+        effective_to=mapping.effective_to,
+        decision_source=mapping.decision_source,
+        status=mapping.status.value,
+        created_at_utc=mapping.created_at_utc,
     )
 
 
@@ -221,17 +236,20 @@ def create_instrument_mapping(
                 }
             ]
         ) from exc
-    return MappingResponse(
-        mapping_id=mapping.mapping_id,
-        dataset_id=mapping.dataset_id,
-        source_instrument_identifier=mapping.source_instrument_identifier,
-        instrument_id=mapping.instrument_id,
-        effective_from=mapping.effective_from,
-        effective_to=mapping.effective_to,
-        decision_source=mapping.decision_source,
-        status=mapping.status.value,
-        created_at_utc=mapping.created_at_utc,
-    )
+    return _mapping_response(mapping)
+
+
+@v1_instruments_router.get(
+    "/datasets/{dataset_id}/instrument-mappings", response_model=DatasetMappingListResponse
+)
+def list_dataset_instrument_mappings(
+    dataset_id: str, settings: Settings = Depends(get_settings)
+) -> DatasetMappingListResponse:
+    if DuckDBDatasetRepository(settings).get(dataset_id) is None:
+        raise NotFoundError()
+
+    mappings = DuckDBDatasetInstrumentMappingRepository(settings).list_for_dataset(dataset_id)
+    return DatasetMappingListResponse(items=[_mapping_response(mapping) for mapping in mappings])
 
 
 @v1_instruments_router.post(

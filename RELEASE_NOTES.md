@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-020)
+# Release Notes — v1 (TASK-001 through TASK-021)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -38,7 +38,8 @@ historical simulation only.
   dashboard that performs no financial calculation itself — every number
   displayed comes directly from the backend as a decimal string. Datasets,
   strategies, backtest runs, and optimizations can all be created and
-  executed entirely from the browser.
+  executed entirely from the browser, choosing from dropdown pickers
+  populated from real data rather than copy-pasting IDs between pages.
 
 ## Known v1 limitations
 
@@ -190,3 +191,15 @@ a real `OPTIONS` preflight against the rebuilt running container
 - `docs/adr/ADR-013-multi-indicator-combo-strategy-kind.md` records the
   AND-entry/OR-exit design and the engine's shared signal-line refactor
   that guarantees a combo condition matches its standalone behavior.
+
+## Verification evidence (TASK-021)
+
+- Backend: `ruff format --check .`, `ruff check .`, `mypy .`, `pytest -q`
+  — all clean, 322 tests passed (2 new: the dataset-instrument-mappings
+  list endpoint's success and 404 cases).
+- Frontend: `npm run format`/`lint`/`type-check` clean, `npm run test` —
+  100 passed across 23 files, `npm run build` succeeds (13 routes).
+- `/runs/new` and `/optimizations/new` no longer have any free-text ID
+  field a user must copy from another page; the instrument picker is
+  gated on selecting a dataset first and only offers instruments actually
+  mapped to it.

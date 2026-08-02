@@ -180,6 +180,32 @@ def test_create_overlapping_mapping_returns_409(client: TestClient) -> None:
     assert conflict.status_code == 409
 
 
+def test_list_dataset_instrument_mappings(client: TestClient) -> None:
+    dataset_id = _create_dataset(client)
+    instrument = _create_instrument(client)
+    client.post(
+        f"/api/v1/datasets/{dataset_id}/instrument-mappings",
+        json={
+            "source_instrument_identifier": "BBCA",
+            "instrument_id": instrument["instrument_id"],
+            "effective_from": "2026-01-01",
+            "decision_source": "manual_review",
+        },
+    )
+
+    response = client.get(f"/api/v1/datasets/{dataset_id}/instrument-mappings")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["instrument_id"] == instrument["instrument_id"]
+
+
+def test_list_dataset_instrument_mappings_unknown_dataset_returns_404(client: TestClient) -> None:
+    response = client.get("/api/v1/datasets/does-not-exist/instrument-mappings")
+    assert response.status_code == 404
+
+
 def test_record_corporate_action_and_list(client: TestClient) -> None:
     instrument = _create_instrument(client)
 

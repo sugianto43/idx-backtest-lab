@@ -2,16 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Disclaimer } from "@/components/layout/Disclaimer";
 import { ErrorState } from "@/components/status/ErrorState";
 import { LoadingState } from "@/components/status/LoadingState";
+import { fetchDatasets, type DatasetSummary } from "@/lib/api/datasets";
+import {
+  fetchDatasetInstrumentMappings,
+  type DatasetInstrumentMapping,
+} from "@/lib/api/instruments";
 import {
   createOptimization,
   OBJECTIVE_METRIC_KEYS,
   type ObjectiveMetricKey,
 } from "@/lib/api/optimizations";
 import type { ApiError } from "@/lib/api/types";
+
+const PICKER_PAGE_SIZE = 100;
 
 const POSITIVE_INTEGER_LIST = /^\s*[1-9]\d*\s*(,\s*[1-9]\d*\s*)*$/;
 
@@ -80,9 +87,37 @@ const INITIAL_FORM: FormState = {
 export default function NewOptimizationPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [datasets, setDatasets] = useState<DatasetSummary[] | null>(null);
+  const [mappings, setMappings] = useState<DatasetInstrumentMapping[] | null>(null);
+  const [pickerError, setPickerError] = useState<ApiError | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDatasets({ limit: PICKER_PAGE_SIZE, offset: 0 }).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setDatasets(result.data.items);
+      else setPickerError(result.error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!form.datasetId) return;
+    let cancelled = false;
+    fetchDatasetInstrumentMappings(form.datasetId).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setMappings(result.data.items);
+      else setPickerError(result.error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.datasetId]);
 
   const previewCandidateCount = useMemo(() => {
     const fastWindows = parseIntegerList(form.fastWindows);
@@ -175,29 +210,70 @@ export default function NewOptimizationPage() {
         evaluation is sealed until the optimization completes.
       </p>
 
+      {pickerError && <ErrorState error={pickerError} />}
+
       <form onSubmit={handleSubmit} noValidate>
         <div>
-          <label htmlFor="dataset_id">Dataset ID</label>
-          <input
+          <label htmlFor="dataset_id">Dataset</label>
+          <select
             id="dataset_id"
             value={form.datasetId}
-            onChange={(event) => setForm({ ...form, datasetId: event.target.value })}
+            onChange={(event) => {
+              setForm({ ...form, datasetId: event.target.value, instrumentId: "" });
+              setMappings(null);
+            }}
+            disabled={!datasets}
             required
             aria-describedby="dataset_id-help"
-          />
+          >
+            <option value="" disabled>
+              {datasets ? "Select a dataset…" : "Loading datasets…"}
+            </option>
+            {datasets?.map((dataset) => (
+              <option key={dataset.dataset_id} value={dataset.dataset_id}>
+                {dataset.name}
+              </option>
+            ))}
+          </select>
           <p id="dataset_id-help">
-            Copy the dataset ID from the <Link href="/datasets">datasets list</Link>.
+            {datasets?.length === 0 ? (
+              <>
+                No datasets exist yet — <Link href="/datasets/import">import one</Link> first.
+              </>
+            ) : (
+              "Selecting a dataset loads its mapped instruments below."
+            )}
           </p>
         </div>
 
         <div>
-          <label htmlFor="instrument_id">Instrument ID</label>
-          <input
+          <label htmlFor="instrument_id">Instrument</label>
+          <select
             id="instrument_id"
             value={form.instrumentId}
             onChange={(event) => setForm({ ...form, instrumentId: event.target.value })}
+            disabled={!form.datasetId || !mappings}
             required
-          />
+            aria-describedby="instrument_id-help"
+          >
+            <option value="" disabled>
+              {!form.datasetId
+                ? "Select a dataset first…"
+                : mappings
+                  ? "Select an instrument…"
+                  : "Loading instruments…"}
+            </option>
+            {mappings?.map((mapping) => (
+              <option key={mapping.mapping_id} value={mapping.instrument_id}>
+                {mapping.source_instrument_identifier}
+              </option>
+            ))}
+          </select>
+          <p id="instrument_id-help">
+            {form.datasetId && mappings?.length === 0
+              ? "No instruments are mapped to this dataset yet."
+              : "Only instruments already mapped to the chosen dataset are shown."}
+          </p>
         </div>
 
         <div>
