@@ -193,3 +193,90 @@ def test_create_strategy_rejects_eligible_after_bars_below_warmup(client: TestCl
     response = client.post("/api/v1/strategies", json=payload)
 
     assert response.status_code == 422
+
+
+def test_create_multi_indicator_combo_strategy_returns_201(client: TestClient) -> None:
+    payload = {
+        "name": "SMA + RSI combo",
+        "kind": "multi_indicator_combo",
+        "parameters": {
+            "conditions": [
+                {
+                    "kind": "sma_crossover",
+                    "parameters": {"fast_window": 10, "slow_window": 30, "price_field": "close"},
+                },
+                {
+                    "kind": "rsi_threshold",
+                    "parameters": {
+                        "period": 14,
+                        "oversold_threshold": 30,
+                        "overbought_threshold": 70,
+                        "price_field": "close",
+                    },
+                },
+            ]
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 30,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["kind"] == "multi_indicator_combo"
+    assert len(body["parameters"]["conditions"]) == 2
+
+
+def test_create_multi_indicator_combo_rejects_single_condition(client: TestClient) -> None:
+    payload = {
+        "name": "Single-condition combo",
+        "kind": "multi_indicator_combo",
+        "parameters": {
+            "conditions": [
+                {
+                    "kind": "sma_crossover",
+                    "parameters": {"fast_window": 10, "slow_window": 30, "price_field": "close"},
+                }
+            ]
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 30,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_create_multi_indicator_combo_rejects_duplicate_condition_kinds(
+    client: TestClient,
+) -> None:
+    payload = {
+        "name": "Duplicate-kind combo",
+        "kind": "multi_indicator_combo",
+        "parameters": {
+            "conditions": [
+                {
+                    "kind": "sma_crossover",
+                    "parameters": {"fast_window": 10, "slow_window": 30, "price_field": "close"},
+                },
+                {
+                    "kind": "sma_crossover",
+                    "parameters": {"fast_window": 5, "slow_window": 20, "price_field": "close"},
+                },
+            ]
+        },
+        "signal_policy": {
+            "signal_time": "bar_close",
+            "eligible_after_bars": 30,
+            "long_only": True,
+        },
+    }
+    response = client.post("/api/v1/strategies", json=payload)
+
+    assert response.status_code == 422

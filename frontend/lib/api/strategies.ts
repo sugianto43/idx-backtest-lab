@@ -1,8 +1,12 @@
 import { apiFetch } from "./client";
 import type { ApiResult, PaginatedResponse } from "./types";
 
-export type StrategyKind =
+export type BaseStrategyKind =
   "sma_crossover" | "rsi_threshold" | "macd_crossover" | "bollinger_breakout";
+export type StrategyKind = BaseStrategyKind | "multi_indicator_combo";
+
+export const MIN_COMBO_CONDITIONS = 2;
+export const MAX_COMBO_CONDITIONS = 3;
 
 export interface SignalPolicy {
   signal_time: "bar_close";
@@ -16,7 +20,7 @@ export interface StrategySpecResponse {
   schema_version: number;
   name: string;
   kind: string;
-  parameters: Record<string, number | string>;
+  parameters: Record<string, unknown>;
   signal_policy: SignalPolicy;
   checksum: string;
   created_at_utc: string;
@@ -51,7 +55,7 @@ export interface StrategyKindField {
 }
 
 export interface StrategyKindConfig {
-  value: StrategyKind;
+  value: BaseStrategyKind;
   label: string;
   description: string;
   fields: StrategyKindField[];
@@ -59,6 +63,7 @@ export interface StrategyKindConfig {
   requiredWarmupBars: (parameters: Record<string, number>) => number;
 }
 
+/** The four base indicator kinds — also the pool a custom combo's conditions are picked from. */
 export const STRATEGY_KINDS: StrategyKindConfig[] = [
   {
     value: "sma_crossover",
@@ -172,22 +177,30 @@ export function strategyKindConfig(kind: string): StrategyKindConfig | undefined
   return STRATEGY_KINDS.find((k) => k.value === kind);
 }
 
+interface ComboConditionValue {
+  kind: string;
+  parameters: Record<string, number | string>;
+}
+
 /** Human-readable one-line summary of a strategy's parameters for list views. */
-export function summarizeParameters(
-  kind: string,
-  parameters: Record<string, number | string>,
-): string {
+export function summarizeParameters(kind: string, parameters: Record<string, unknown>): string {
+  if (kind === "multi_indicator_combo") {
+    const conditions = (parameters.conditions as ComboConditionValue[] | undefined) ?? [];
+    return conditions
+      .map((condition) => strategyKindConfig(condition.kind)?.label ?? condition.kind)
+      .join(" AND ");
+  }
   const config = strategyKindConfig(kind);
   if (!config) return JSON.stringify(parameters);
   return config.fields
-    .map((field) => `${field.label.split(" (")[0]}=${parameters[field.key]}`)
+    .map((field) => `${field.label.split(" (")[0]}=${String(parameters[field.key])}`)
     .join(", ");
 }
 
 export interface CreateStrategyFields {
   name: string;
   kind: StrategyKind;
-  parameters: Record<string, number | string>;
+  parameters: Record<string, unknown>;
   eligibleAfterBars: number;
 }
 

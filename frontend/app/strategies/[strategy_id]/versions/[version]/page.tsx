@@ -72,6 +72,11 @@ export default function StrategyVersionDetailPage() {
 
   const spec = state.data;
   const config = strategyKindConfig(spec.kind);
+  const isCombo = spec.kind === "multi_indicator_combo";
+  const comboConditions = isCombo
+    ? ((spec.parameters.conditions as { kind: string; parameters: Record<string, unknown> }[]) ??
+      [])
+    : [];
 
   return (
     <>
@@ -92,10 +97,15 @@ export default function StrategyVersionDetailPage() {
             { label: "Strategy ID", value: spec.strategy_id },
             { label: "Version", value: String(spec.version) },
             { label: "Kind", value: spec.kind },
-            ...(config?.fields.map((field) => ({
-              label: field.label,
-              value: String(spec.parameters[field.key]),
-            })) ?? []),
+            ...(isCombo
+              ? comboConditions.map((condition, index) => ({
+                  label: `Condition ${index + 1}`,
+                  value: `${strategyKindConfig(condition.kind)?.label ?? condition.kind}: ${JSON.stringify(condition.parameters)}`,
+                }))
+              : (config?.fields.map((field) => ({
+                  label: field.label,
+                  value: String(spec.parameters[field.key]),
+                })) ?? [])),
             { label: "Checksum", value: spec.checksum },
             { label: "Created", value: spec.created_at_utc },
           ]}
@@ -114,8 +124,11 @@ export default function StrategyVersionDetailPage() {
       <section aria-labelledby="semantics-heading">
         <h2 id="semantics-heading">What this means</h2>
         <p>
-          {config?.description ?? "This strategy kind's entry/exit rule is not recognized."} Signals
-          are evaluated at each bar&apos;s close, but any resulting order fills at the{" "}
+          {isCombo
+            ? "Every condition above must signal on the same bar to enter; any one condition's exit signal closes the position."
+            : (config?.description ??
+              "This strategy kind's entry/exit rule is not recognized.")}{" "}
+          Signals are evaluated at each bar&apos;s close, but any resulting order fills at the{" "}
           <strong>next bar&apos;s open</strong> in a backtest run — never at the signal bar&apos;s
           own close. This specification does not execute or evaluate anything by itself.
         </p>

@@ -248,6 +248,42 @@ class _BaseCrossoverStrategy(bt.Strategy):  # type: ignore[misc]
             self.failure_code = "missing_next_bar"
 
 
+def _build_signal_lines(data: Any, kind: str, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Returns (entry_line, exit_line): entry_line[0] > 0 signals entry, exit_line[0] > 0 exit.
+
+    Shared by every single-kind strategy class and by ``_MultiIndicatorComboStrategy``, so a
+    combo condition behaves identically to that same kind used on its own.
+    """
+    if kind == "sma_crossover":
+        fast = bt.indicators.SimpleMovingAverage(data.close, period=params["fast_window"])
+        slow = bt.indicators.SimpleMovingAverage(data.close, period=params["slow_window"])
+        return bt.indicators.CrossUp(fast, slow), bt.indicators.CrossDown(fast, slow)
+    if kind == "rsi_threshold":
+        rsi = bt.indicators.RSI(data.close, period=params["period"], safediv=True)
+        return (
+            bt.indicators.CrossUp(rsi, params["oversold_threshold"]),
+            bt.indicators.CrossDown(rsi, params["overbought_threshold"]),
+        )
+    if kind == "macd_crossover":
+        macd = bt.indicators.MACD(
+            data.close,
+            period_me1=params["fast_period"],
+            period_me2=params["slow_period"],
+            period_signal=params["signal_period"],
+        )
+        return bt.indicators.CrossUp(macd.macd, macd.signal), bt.indicators.CrossDown(
+            macd.macd, macd.signal
+        )
+    if kind == "bollinger_breakout":
+        bollinger = bt.indicators.BollingerBands(
+            data.close, period=params["period"], devfactor=float(params["num_std_dev"])
+        )
+        return bt.indicators.CrossUp(data.close, bollinger.top), bt.indicators.CrossDown(
+            data.close, bollinger.mid
+        )
+    raise ValueError(f"unsupported base signal kind {kind!r}")
+
+
 class _SmaCrossoverStrategy(_BaseCrossoverStrategy):
     params = (  # type: ignore[assignment]
         ("fast_window", None),
@@ -256,19 +292,17 @@ class _SmaCrossoverStrategy(_BaseCrossoverStrategy):
 
     def __init__(self) -> None:
         super().__init__()
-        self.fast_sma = bt.indicators.SimpleMovingAverage(
-            self.data.close, period=self.p.fast_window
+        self.entry_line, self.exit_line = _build_signal_lines(
+            self.data,
+            "sma_crossover",
+            {"fast_window": self.p.fast_window, "slow_window": self.p.slow_window},
         )
-        self.slow_sma = bt.indicators.SimpleMovingAverage(
-            self.data.close, period=self.p.slow_window
-        )
-        self.cross = bt.indicators.CrossOver(self.fast_sma, self.slow_sma)
 
     def _entry_signal(self) -> bool:
-        return bool(self.cross[0] > 0)
+        return bool(self.entry_line[0] > 0)
 
     def _exit_signal(self) -> bool:
-        return bool(self.cross[0] < 0)
+        return bool(self.exit_line[0] > 0)
 
 
 class _RsiThresholdStrategy(_BaseCrossoverStrategy):
@@ -280,15 +314,21 @@ class _RsiThresholdStrategy(_BaseCrossoverStrategy):
 
     def __init__(self) -> None:
         super().__init__()
-        self.rsi = bt.indicators.RSI(self.data.close, period=self.p.period, safediv=True)
-        self.cross_up_oversold = bt.indicators.CrossUp(self.rsi, self.p.oversold_threshold)
-        self.cross_down_overbought = bt.indicators.CrossDown(self.rsi, self.p.overbought_threshold)
+        self.entry_line, self.exit_line = _build_signal_lines(
+            self.data,
+            "rsi_threshold",
+            {
+                "period": self.p.period,
+                "oversold_threshold": self.p.oversold_threshold,
+                "overbought_threshold": self.p.overbought_threshold,
+            },
+        )
 
     def _entry_signal(self) -> bool:
-        return bool(self.cross_up_oversold[0] > 0)
+        return bool(self.entry_line[0] > 0)
 
     def _exit_signal(self) -> bool:
-        return bool(self.cross_down_overbought[0] > 0)
+        return bool(self.exit_line[0] > 0)
 
 
 class _MacdCrossoverStrategy(_BaseCrossoverStrategy):
@@ -300,19 +340,21 @@ class _MacdCrossoverStrategy(_BaseCrossoverStrategy):
 
     def __init__(self) -> None:
         super().__init__()
-        self.macd = bt.indicators.MACD(
-            self.data.close,
-            period_me1=self.p.fast_period,
-            period_me2=self.p.slow_period,
-            period_signal=self.p.signal_period,
+        self.entry_line, self.exit_line = _build_signal_lines(
+            self.data,
+            "macd_crossover",
+            {
+                "fast_period": self.p.fast_period,
+                "slow_period": self.p.slow_period,
+                "signal_period": self.p.signal_period,
+            },
         )
-        self.cross = bt.indicators.CrossOver(self.macd.macd, self.macd.signal)
 
     def _entry_signal(self) -> bool:
-        return bool(self.cross[0] > 0)
+        return bool(self.entry_line[0] > 0)
 
     def _exit_signal(self) -> bool:
-        return bool(self.cross[0] < 0)
+        return bool(self.exit_line[0] > 0)
 
 
 class _BollingerBreakoutStrategy(_BaseCrossoverStrategy):
@@ -323,17 +365,39 @@ class _BollingerBreakoutStrategy(_BaseCrossoverStrategy):
 
     def __init__(self) -> None:
         super().__init__()
-        self.bollinger = bt.indicators.BollingerBands(
-            self.data.close, period=self.p.period, devfactor=float(self.p.num_std_dev)
+        self.entry_line, self.exit_line = _build_signal_lines(
+            self.data,
+            "bollinger_breakout",
+            {"period": self.p.period, "num_std_dev": self.p.num_std_dev},
         )
-        self.entry_cross = bt.indicators.CrossUp(self.data.close, self.bollinger.top)
-        self.exit_cross = bt.indicators.CrossDown(self.data.close, self.bollinger.mid)
 
     def _entry_signal(self) -> bool:
-        return bool(self.entry_cross[0] > 0)
+        return bool(self.entry_line[0] > 0)
 
     def _exit_signal(self) -> bool:
-        return bool(self.exit_cross[0] > 0)
+        return bool(self.exit_line[0] > 0)
+
+
+class _MultiIndicatorComboStrategy(_BaseCrossoverStrategy):
+    """Entry requires every condition's signal on the same bar (AND); exit fires on any one
+    condition's exit signal (OR) — harder to get in, easier to get out."""
+
+    params = (("conditions", None),)  # type: ignore[assignment]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entry_lines = []
+        self.exit_lines = []
+        for condition_kind, condition_params in self.p.conditions:
+            entry_line, exit_line = _build_signal_lines(self.data, condition_kind, condition_params)
+            self.entry_lines.append(entry_line)
+            self.exit_lines.append(exit_line)
+
+    def _entry_signal(self) -> bool:
+        return all(line[0] > 0 for line in self.entry_lines)
+
+    def _exit_signal(self) -> bool:
+        return any(line[0] > 0 for line in self.exit_lines)
 
 
 _STRATEGY_CLASS_AND_KWARGS: dict[str, Callable[[StrategySpecV1], tuple[type, dict[str, Any]]]] = {
@@ -365,6 +429,15 @@ _STRATEGY_CLASS_AND_KWARGS: dict[str, Callable[[StrategySpecV1], tuple[type, dic
         {
             "period": strategy.parameters.period,  # type: ignore[union-attr]
             "num_std_dev": strategy.parameters.num_std_dev,  # type: ignore[union-attr]
+        },
+    ),
+    "multi_indicator_combo": lambda strategy: (
+        _MultiIndicatorComboStrategy,
+        {
+            "conditions": [
+                (condition.kind, condition.parameters.to_canonical_dict())
+                for condition in strategy.parameters.conditions  # type: ignore[union-attr]
+            ],
         },
     ),
 }
