@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-019)
+# Release Notes — v1 (TASK-001 through TASK-020)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -17,11 +17,13 @@ historical simulation only.
   range.
 - Record corporate actions as immutable evidence (no price/share
   adjustment is calculated anywhere in the system).
-- Author immutable, versioned strategy specifications in one of four kinds
+- Author immutable, versioned strategy specifications in one of five kinds
   — `sma_crossover`, `rsi_threshold`, `macd_crossover`, `bollinger_breakout`
-  (see ADR-012) — all long-only, next-bar-open fills, bar-close signal
-  timing. Each kind is a fixed, deterministic indicator rule with
-  configurable parameters; none accept custom code or expressions.
+  (ADR-012), or a custom `multi_indicator_combo` of 2-3 of the above with
+  AND-entry/OR-exit semantics (ADR-013) — all long-only, next-bar-open
+  fills, bar-close signal timing. Every kind is a fixed, deterministic
+  rule with configurable parameters; none accept custom code or
+  expressions.
 - Create and execute a single-instrument backtest run, and retrieve its
   full immutable artifact bundle: order/fill/position/cash events,
   per-bar portfolio snapshots, 8 documented metrics (each explicitly
@@ -42,11 +44,12 @@ historical simulation only.
 
 - **Single instrument only.** Multi-instrument backtest runs and
   optimizations are explicitly rejected.
-- **Four fixed strategy kinds, no custom code.** `sma_crossover`,
-  `rsi_threshold`, `macd_crossover`, `bollinger_breakout` — all long-only,
-  no short selling, no custom code or expressions. A combination/custom
-  kind is planned but not yet implemented (TASK-020). Parameter
-  optimization (grid search) still only supports `sma_crossover`.
+- **Five fixed strategy kinds, no custom code.** `sma_crossover`,
+  `rsi_threshold`, `macd_crossover`, `bollinger_breakout`, and
+  `multi_indicator_combo` (2-3 of the others, AND-entry/OR-exit) — all
+  long-only, no short selling, no custom code or expressions. A combo
+  condition may not repeat a base kind. Parameter optimization (grid
+  search) still only supports `sma_crossover`.
 - **No charting.** All evidence is presented as structured data and
   tables; no client-side or server-side chart rendering exists.
 - **8 fixed metrics.** `initial_equity`, `final_equity`, `total_return`,
@@ -175,3 +178,15 @@ a real `OPTIONS` preflight against the rebuilt running container
 - `docs/adr/ADR-012-additional-strategy-kinds.md` records the design,
   including why a free-form custom-code strategy editor was explicitly
   ruled out in favor of curated, parameterized indicator kinds.
+
+## Verification evidence (TASK-020)
+
+- Backend: `ruff format --check .`, `ruff check .`, `mypy .`, `pytest -q`
+  — all clean, 320 tests passed (14 new: combo domain validation, API
+  creation/rejection tests, and an engine smoke test proving AND-entry
+  across two real conditions on the same bar).
+- Frontend: `npm run format`/`lint`/`type-check` clean, `npm run test` —
+  98 passed across 23 files, `npm run build` succeeds (13 routes).
+- `docs/adr/ADR-013-multi-indicator-combo-strategy-kind.md` records the
+  AND-entry/OR-exit design and the engine's shared signal-line refactor
+  that guarantees a combo condition matches its standalone behavior.

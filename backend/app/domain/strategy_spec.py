@@ -3,9 +3,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 ALLOWED_PRICE_FIELDS = frozenset({"close"})
-SUPPORTED_STRATEGY_KINDS = frozenset(
+BASE_STRATEGY_KINDS = frozenset(
     {"sma_crossover", "rsi_threshold", "macd_crossover", "bollinger_breakout"}
 )
+SUPPORTED_STRATEGY_KINDS = BASE_STRATEGY_KINDS | {"multi_indicator_combo"}
+MIN_COMBO_CONDITIONS = 2
+MAX_COMBO_CONDITIONS = 3
 STRATEGY_SCHEMA_VERSION = 1
 
 
@@ -158,7 +161,7 @@ class BollingerBreakoutParameters:
         return self.period
 
 
-StrategyParameters = (
+BaseStrategyParameters = (
     SmaCrossoverParameters
     | RsiThresholdParameters
     | MacdCrossoverParameters
@@ -173,11 +176,97 @@ _KIND_TO_PARAMETERS_TYPE: dict[str, type] = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ComboCondition:
+    kind: str
+    parameters: BaseStrategyParameters
+
+    def __post_init__(self) -> None:
+        if self.kind not in BASE_STRATEGY_KINDS:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"condition kind must be one of {sorted(BASE_STRATEGY_KINDS)}",
+            )
+        if type(self.parameters) is not _KIND_TO_PARAMETERS_TYPE[self.kind]:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"condition parameters type does not match condition kind {self.kind!r}",
+            )
+
+    def to_canonical_dict(self) -> dict[str, object]:
+        return {"kind": self.kind, "parameters": self.parameters.to_canonical_dict()}
+
+
+@dataclass(frozen=True, slots=True)
+class MultiIndicatorComboParameters:
+    conditions: tuple[ComboCondition, ...]
+
+    def __post_init__(self) -> None:
+        if not (MIN_COMBO_CONDITIONS <= len(self.conditions) <= MAX_COMBO_CONDITIONS):
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"conditions must contain between {MIN_COMBO_CONDITIONS} and "
+                f"{MAX_COMBO_CONDITIONS} entries",
+            )
+        kinds = [condition.kind for condition in self.conditions]
+        if len(set(kinds)) != len(kinds):
+            raise StrategySpecValidationError(
+                "invalid_parameters", "each condition must use a distinct base kind"
+            )
+
+    def to_canonical_dict(self) -> dict[str, object]:
+        return {"conditions": [condition.to_canonical_dict() for condition in self.conditions]}
+
+    def required_warmup_bars(self) -> int:
+        return max(condition.parameters.required_warmup_bars() for condition in self.conditions)
+
+
+StrategyParameters = BaseStrategyParameters | MultiIndicatorComboParameters
+
+_KIND_TO_PARAMETERS_TYPE["multi_indicator_combo"] = MultiIndicatorComboParameters
+
+
+def _build_combo_parameters(raw: Mapping[str, object]) -> MultiIndicatorComboParameters:
+    raw_conditions = raw.get("conditions")
+    if not isinstance(raw_conditions, list):
+        raise StrategySpecValidationError("invalid_parameters", "conditions must be a list")
+    conditions: list[ComboCondition] = []
+    for raw_condition in raw_conditions:
+        if (
+            not isinstance(raw_condition, Mapping)
+            or "kind" not in raw_condition
+            or "parameters" not in raw_condition
+        ):
+            raise StrategySpecValidationError(
+                "invalid_parameters", "each condition needs a kind and parameters"
+            )
+        condition_kind = raw_condition["kind"]
+        if condition_kind not in BASE_STRATEGY_KINDS:
+            raise StrategySpecValidationError(
+                "invalid_parameters",
+                f"condition kind must be one of {sorted(BASE_STRATEGY_KINDS)}",
+            )
+        # condition_kind was just checked against BASE_STRATEGY_KINDS, so build_parameters
+        # can never actually return a MultiIndicatorComboParameters here.
+        condition_parameters = build_parameters(condition_kind, raw_condition["parameters"])
+        conditions.append(
+            ComboCondition(kind=condition_kind, parameters=condition_parameters)  # type: ignore[arg-type]
+        )
+    try:
+        return MultiIndicatorComboParameters(conditions=tuple(conditions))
+    except TypeError as exc:
+        raise StrategySpecValidationError(
+            "invalid_parameters", f"conditions do not match multi_indicator_combo: {exc}"
+        ) from exc
+
+
 def build_parameters(kind: str, raw: Mapping[str, object]) -> StrategyParameters:
     if kind not in SUPPORTED_STRATEGY_KINDS:
         raise StrategySpecValidationError(
             "unsupported_kind", f"kind must be one of {sorted(SUPPORTED_STRATEGY_KINDS)}"
         )
+    if kind == "multi_indicator_combo":
+        return _build_combo_parameters(raw)
     parameters_type = _KIND_TO_PARAMETERS_TYPE[kind]
     try:
         return parameters_type(**raw)  # type: ignore[no-any-return]

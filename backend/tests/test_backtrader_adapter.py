@@ -19,7 +19,9 @@ from app.domain.execution_result import OrderSide, OrderStatus, TerminalStatus
 from app.domain.market_data import NormalizedBar
 from app.domain.strategy_spec import (
     BollingerBreakoutParameters,
+    ComboCondition,
     MacdCrossoverParameters,
+    MultiIndicatorComboParameters,
     RsiThresholdParameters,
     SignalPolicy,
     SmaCrossoverParameters,
@@ -271,6 +273,47 @@ def test_macd_crossover_strategy_enters_and_exits_on_a_v_shaped_price_path() -> 
             fast_period=3, slow_period=6, signal_period=2, price_field="close"
         ),
         signal_policy=SignalPolicy(signal_time="bar_close", eligible_after_bars=8, long_only=True),
+    )
+
+    result = _run_adapter(bars, manifest, strategy)
+
+    assert result.terminal_status == TerminalStatus.COMPLETED
+    assert len(result.fill_events) >= 1
+    assert result.fill_events[0].side == OrderSide.BUY
+
+
+def test_multi_indicator_combo_strategy_requires_all_conditions_to_enter() -> None:
+    # Same dip-then-rally-then-fade path used for the standalone RSI test: it also drives an
+    # SMA crossover, so the AND-combination has an opportunity to align both conditions.
+    down = [100 - 3 * i for i in range(15)]
+    up = [down[-1] + 5 * i for i in range(1, 21)]
+    fade = [up[-1] - 5 * i for i in range(1, 16)]
+    closes = down + up + fade
+    bars = _bars(closes)
+    manifest = _manifest(num_bars=len(closes))
+    strategy = _strategy(
+        name="SMA + RSI combo",
+        kind="multi_indicator_combo",
+        parameters=MultiIndicatorComboParameters(
+            conditions=(
+                ComboCondition(
+                    kind="sma_crossover",
+                    parameters=SmaCrossoverParameters(
+                        fast_window=3, slow_window=4, price_field="close"
+                    ),
+                ),
+                ComboCondition(
+                    kind="rsi_threshold",
+                    parameters=RsiThresholdParameters(
+                        period=5,
+                        oversold_threshold=30,
+                        overbought_threshold=70,
+                        price_field="close",
+                    ),
+                ),
+            )
+        ),
+        signal_policy=SignalPolicy(signal_time="bar_close", eligible_after_bars=6, long_only=True),
     )
 
     result = _run_adapter(bars, manifest, strategy)
