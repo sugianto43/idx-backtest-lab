@@ -59,11 +59,16 @@ class RunManifest:
     started_at_utc: datetime | None = None
     finished_at_utc: datetime | None = None
     failure_code: str | None = None
+    schema_version: int | None = None
+    manifest_checksum: str | None = None
+    strategy_id: str | None = None
+    strategy_version: int | None = None
 
     def __post_init__(self) -> None:
         self._validate_identity()
         self._validate_status_and_payload()
         self._validate_temporal_fields()
+        self._validate_manifest_reference()
 
     def _validate_identity(self) -> None:
         if not self.run_id:
@@ -92,3 +97,13 @@ class RunManifest:
             and self.finished_at_utc < self.started_at_utc
         ):
             raise RunManifestValidationError("finished_at_utc must not be before started_at_utc")
+
+    def _validate_manifest_reference(self) -> None:
+        if self.schema_version is not None and self.schema_version < 1:
+            raise RunManifestValidationError("schema_version must be a positive integer")
+        if self.manifest_checksum is not None and not self.manifest_checksum.strip():
+            raise RunManifestValidationError("manifest_checksum must not be empty when provided")
+        if self.strategy_id is not None and not self.strategy_id.strip():
+            raise RunManifestValidationError("strategy_id must not be empty when provided")
+        if self.strategy_version is not None and self.strategy_version < 1:
+            raise RunManifestValidationError("strategy_version must be a positive integer")

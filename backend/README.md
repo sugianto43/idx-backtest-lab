@@ -1,15 +1,30 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-005 provide
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-006 provide
 the process skeleton, layered package boundaries (`api`, `application`,
 `domain`, `infrastructure`), health/readiness endpoints, typed configuration,
 structured logging with correlation IDs, a safe error envelope, a local
 DuckDB persistence boundary, offline provider-neutral CSV market-data
-ingestion, and instrument/corporate-action identity records. See
-`.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
-`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003,
-ADR-004, `docs/CSV_INGESTION_CONTRACT.md`, and
-`docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`.
+ingestion, instrument/corporate-action identity records, and immutable
+strategy/run-manifest validation. See `.claude/ARCHITECTURE_RULES.md`,
+`docs/TDD.md`, `docs/adr/ADR-002-local-persistence-and-schema-evolution.md`,
+ADR-003, ADR-004, ADR-005, `docs/CSV_INGESTION_CONTRACT.md`,
+`docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`, and
+`docs/BACKTEST_MANIFEST_CONTRACT.md`.
+
+## Strategies and backtest runs
+
+`POST /api/v1/strategies` creates an immutable `sma_crossover` v1 strategy
+specification (checksummed canonical JSON). `POST /api/v1/backtest-runs`
+validates and persists a fully materialized, checksummed run manifest
+(exact strategy/dataset references, resolved instrument universe, period
+inside the dataset's declared coverage, capital, execution assumptions,
+metric settings) with status `created` — **no engine is invoked and no
+result is produced here** (TASK-007). Most v1 execution-assumption fields
+(commission/tax/slippage `none`, liquidity/price-limit `ignore_with_warning`,
+signal/fill timing, benchmark `none`) are fixed constants materialized into
+every manifest rather than caller-configurable inputs, since the contract
+defines exactly one supported value for each in v1.
 
 ## Instruments and corporate actions
 

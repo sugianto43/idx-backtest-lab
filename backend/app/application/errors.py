@@ -81,3 +81,10 @@ class CorporateActionNotFoundError(ApplicationError):
     def __init__(self, event_id: str) -> None:
         super().__init__(f"Corporate action not found: {event_id}")
         self.event_id = event_id
+
+
+class StrategySpecNotFoundError(ApplicationError):
+    def __init__(self, strategy_id: str, version: int) -> None:
+        super().__init__(f"Strategy spec not found: {strategy_id}@{version}")
+        self.strategy_id = strategy_id
+        self.version = version
