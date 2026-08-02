@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_exception_handlers
 from app.api.middleware import CorrelationIdMiddleware
@@ -43,6 +44,17 @@ def create_app() -> FastAPI:
         title="idx-backtesting-lab-api", version=settings.version, lifespan=_lifespan
     )
     application.add_middleware(CorrelationIdMiddleware)
+    # Local-only, single-user, no-auth tool (see RELEASE_NOTES.md) -- there is no
+    # session/cookie-based auth to protect, so a wildcard origin is appropriate.
+    # allow_credentials must stay False when allow_origins is "*" (CORS spec).
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Correlation-Id"],
+    )
     register_exception_handlers(application)
     application.include_router(liveness_router)
     application.include_router(v1_router)
