@@ -8,8 +8,9 @@ API client (`lib/api/`), and reusable accessible status components
 list/detail dashboard (`/datasets`, `/datasets/import`,
 `/datasets/[dataset_id]`, `/runs`, `/runs/[run_id]`), reusable data-display
 components (`components/data/`), and a precision-safe decimal display
-utility (`lib/format/decimal.ts`). `/strategies` remains a placeholder —
-that is TASK-011.
+utility (`lib/format/decimal.ts`). TASK-011 adds strategy authoring
+(`/strategies`, `/strategies/new`, `/strategies/[strategy_id]/versions/[version]`)
+and JSON-body POST support in `lib/api/client.ts`.
 
 ## Prerequisites
 
@@ -51,6 +52,20 @@ event/snapshot collection client-side. The reproducibility manifest
 "download" button packages the already-fetched, backend-provided JSON
 (filename/content-type as returned by the API) into a `Blob` — it never
 regenerates or recomputes the manifest client-side.
+
+## Strategy authoring
+
+`/strategies/new` submits exactly the v1 `sma_crossover` contract payload.
+`price_field` (`close`), `signal_time` (`bar_close`), and `long_only`
+(`true`) are v1-fixed and never presented as user choices; `eligible_after_bars`
+is derived from `slow_window` and shown read-only rather than being a
+separate input. Window inputs are `text`/`inputMode="numeric"` validated
+against `^[1-9]\d*$` — not `type="number"` — so decimal and scientific-notation
+values (`2.5`, `1e3`) are rejected client-side rather than silently coerced.
+Client checks are ergonomic only: the backend remains authoritative, and a
+server rejection preserves every entered value for retry. `/strategies/{id}/versions/{version}`
+renders the returned specification as read-only structured data (no inputs,
+no buttons) and never claims a strategy is profitable, active, or executable.
 
 ## Run the app
 
