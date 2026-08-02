@@ -34,14 +34,84 @@ body {
     sans-serif;
 }
 
-main {
+header,
+main,
+footer {
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 1rem 1.5rem;
+  box-sizing: border-box;
+}
+
+main {
+  flex: 1;
 }
 
 main > * + * {
   margin-top: 1rem;
+}
+
+header nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  list-style: none;
+}
+
+header nav a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+footer {
+  border-top: 1px solid currentColor;
+  opacity: 0.8;
+  font-size: 0.875rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: auto;
+}
+
+.skip-link:focus {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 2px solid currentColor;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.warning-state {
+  border-left: 4px solid #b58900;
+  padding-left: 0.75rem;
+}
+
+.error-state {
+  border-left: 4px solid #b00020;
+  padding-left: 0.75rem;
+}
+
+.unavailable-state {
+  border-left: 4px solid #666;
+  padding-left: 0.75rem;
+}
+
+@media (max-width: 30rem) {
+  header nav ul {
+    gap: 0.5rem 1rem;
+  }
 }
 
 * {
