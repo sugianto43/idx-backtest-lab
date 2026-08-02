@@ -1,13 +1,27 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-004 provide
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-005 provide
 the process skeleton, layered package boundaries (`api`, `application`,
 `domain`, `infrastructure`), health/readiness endpoints, typed configuration,
 structured logging with correlation IDs, a safe error envelope, a local
-DuckDB persistence boundary, and offline provider-neutral CSV market-data
-ingestion. See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
-`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003, and
-`docs/CSV_INGESTION_CONTRACT.md`.
+DuckDB persistence boundary, offline provider-neutral CSV market-data
+ingestion, and instrument/corporate-action identity records. See
+`.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
+`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003,
+ADR-004, `docs/CSV_INGESTION_CONTRACT.md`, and
+`docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`.
+
+## Instruments and corporate actions
+
+Instruments have a stable opaque `instrument_id`; tickers are effective-dated
+aliases (`POST /api/v1/instruments/{id}/aliases`), never primary keys. A
+dataset's raw `source_instrument_identifier` (from TASK-004) resolves to an
+instrument only for a declared date range via
+`POST /api/v1/datasets/{dataset_id}/instrument-mappings`. Corporate actions
+(`POST /api/v1/instruments/{id}/corporate-actions`) are immutable evidence
+records only — no price/share adjustment is calculated anywhere in this
+codebase. Overlapping aliases/mappings for the same symbol or source
+identifier are rejected with `409 conflict`.
 
 ## Dataset import
 

@@ -44,3 +44,40 @@ class DatasetReimportConflictError(ApplicationError):
     def __init__(self, existing_dataset_id: str) -> None:
         super().__init__(f"An identical dataset already exists: {existing_dataset_id}")
         self.existing_dataset_id = existing_dataset_id
+
+
+class DatasetNotFoundError(ApplicationError):
+    def __init__(self, dataset_id: str) -> None:
+        super().__init__(f"Dataset not found: {dataset_id}")
+        self.dataset_id = dataset_id
+
+
+class InstrumentNotFoundError(ApplicationError):
+    def __init__(self, instrument_id: str) -> None:
+        super().__init__(f"Instrument not found: {instrument_id}")
+        self.instrument_id = instrument_id
+
+
+class AliasOverlapError(ApplicationError):
+    def __init__(self, symbol: str, exchange_code: str) -> None:
+        super().__init__(
+            f"An alias for {symbol} on {exchange_code} already exists in an overlapping date range"
+        )
+        self.symbol = symbol
+        self.exchange_code = exchange_code
+
+
+class MappingOverlapError(ApplicationError):
+    def __init__(self, dataset_id: str, source_instrument_identifier: str) -> None:
+        super().__init__(
+            f"A mapping for {source_instrument_identifier} in dataset {dataset_id} "
+            "already exists in an overlapping date range"
+        )
+        self.dataset_id = dataset_id
+        self.source_instrument_identifier = source_instrument_identifier
+
+
+class CorporateActionNotFoundError(ApplicationError):
+    def __init__(self, event_id: str) -> None:
+        super().__init__(f"Corporate action not found: {event_id}")
+        self.event_id = event_id
