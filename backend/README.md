@@ -1,16 +1,32 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-006 provide
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-007 provide
 the process skeleton, layered package boundaries (`api`, `application`,
 `domain`, `infrastructure`), health/readiness endpoints, typed configuration,
 structured logging with correlation IDs, a safe error envelope, a local
 DuckDB persistence boundary, offline provider-neutral CSV market-data
-ingestion, instrument/corporate-action identity records, and immutable
-strategy/run-manifest validation. See `.claude/ARCHITECTURE_RULES.md`,
-`docs/TDD.md`, `docs/adr/ADR-002-local-persistence-and-schema-evolution.md`,
-ADR-003, ADR-004, ADR-005, `docs/CSV_INGESTION_CONTRACT.md`,
-`docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`, and
-`docs/BACKTEST_MANIFEST_CONTRACT.md`.
+ingestion, instrument/corporate-action identity records, immutable
+strategy/run-manifest validation, and a deterministic Backtrader execution
+adapter. See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
+`docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003,
+ADR-004, ADR-005, ADR-006, `docs/CSV_INGESTION_CONTRACT.md`,
+`docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`,
+`docs/BACKTEST_MANIFEST_CONTRACT.md`, and `docs/ENGINE_EXECUTION_CONTRACT.md`.
+
+## Engine execution
+
+`POST /api/v1/backtest-runs/{run_id}:execute` runs a validated, `created`
+manifest through a Backtrader adapter (`app/infrastructure/engine/`) once:
+`sma_crossover` signals are computed from declared `close` values at bar
+close, and orders fill at the *next* bar's open — never the signal bar's own
+close (proven by `tests/test_backtrader_adapter.py`'s smoke fixture). If no
+next bar exists for an eligible signal, the whole run fails closed
+(`missing_next_bar`). The engine emits an in-memory, product-neutral
+`ExecutionResult` (orders/fills/positions/cash/warnings) — Backtrader types
+never cross the adapter boundary, and **no result is persisted or queryable**
+yet; the endpoint returns only event counts and a terminal status as an
+interim summary (TASK-008 adds durable artifacts and metrics). v1 supports
+exactly one instrument per run; multi-instrument manifests are rejected.
 
 ## Strategies and backtest runs
 

@@ -17,5 +17,9 @@ files = ["app", "tests"]
 module = "duckdb"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "backtrader.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
