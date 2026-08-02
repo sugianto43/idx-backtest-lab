@@ -25,6 +25,10 @@ _COLUMNS = (
     "finished_at_utc",
     "warning_count",
     "failure_code",
+    "schema_version",
+    "manifest_checksum",
+    "strategy_id",
+    "strategy_version",
 )
 
 
@@ -41,7 +45,31 @@ def _row_to_run(row: dict[str, Any]) -> RunManifest:
         started_at_utc=from_naive_utc(row["started_at_utc"]) if row["started_at_utc"] else None,
         finished_at_utc=from_naive_utc(row["finished_at_utc"]) if row["finished_at_utc"] else None,
         failure_code=row["failure_code"],
+        schema_version=row["schema_version"],
+        manifest_checksum=row["manifest_checksum"],
+        strategy_id=row["strategy_id"],
+        strategy_version=row["strategy_version"],
     )
+
+
+def _run_values(run: RunManifest) -> list[Any]:
+    return [
+        run.run_id,
+        run.dataset_id,
+        run.strategy_spec_version,
+        run.engine_version,
+        run.configuration_json,
+        run.status.value,
+        to_naive_utc(run.created_at_utc),
+        to_naive_utc(run.started_at_utc) if run.started_at_utc else None,
+        to_naive_utc(run.finished_at_utc) if run.finished_at_utc else None,
+        run.warning_count,
+        run.failure_code,
+        run.schema_version,
+        run.manifest_checksum,
+        run.strategy_id,
+        run.strategy_version,
+    ]
 
 
 class DuckDBBacktestRunRepository:
@@ -61,19 +89,7 @@ class DuckDBBacktestRunRepository:
                 INSERT INTO backtest_runs ({", ".join(_COLUMNS)})
                 VALUES ({", ".join("?" for _ in _COLUMNS)})
                 """,
-                [
-                    run.run_id,
-                    run.dataset_id,
-                    run.strategy_spec_version,
-                    run.engine_version,
-                    run.configuration_json,
-                    run.status.value,
-                    to_naive_utc(run.created_at_utc),
-                    to_naive_utc(run.started_at_utc) if run.started_at_utc else None,
-                    to_naive_utc(run.finished_at_utc) if run.finished_at_utc else None,
-                    run.warning_count,
-                    run.failure_code,
-                ],
+                _run_values(run),
             )
         return run
 
