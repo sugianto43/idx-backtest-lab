@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     port: int = 8000
     version: str = "0.1.0"
     database_path: str = "./data/idx_backtesting_lab.duckdb"
+    optimization_max_candidate_count: int = 50
 
 
 @lru_cache

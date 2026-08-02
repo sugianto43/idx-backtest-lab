@@ -1,19 +1,22 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-008 provide
-the process skeleton, layered package boundaries (`api`, `application`,
-`domain`, `infrastructure`), health/readiness endpoints, typed configuration,
-structured logging with correlation IDs, a safe error envelope, a local
-DuckDB persistence boundary, offline provider-neutral CSV market-data
-ingestion, instrument/corporate-action identity records, immutable
-strategy/run-manifest validation, a deterministic Backtrader execution
-adapter, and an immutable run-artifact/metrics/reproducibility audit trail.
-See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-012
+provide the process skeleton, layered package boundaries (`api`,
+`application`, `domain`, `infrastructure`), health/readiness endpoints,
+typed configuration, structured logging with correlation IDs, a safe error
+envelope, a local DuckDB persistence boundary, offline provider-neutral CSV
+market-data ingestion, instrument/corporate-action identity records,
+immutable strategy/run-manifest validation, a deterministic Backtrader
+execution adapter, an immutable run-artifact/metrics/reproducibility audit
+trail, and an auditable finite-grid parameter optimizer with chronological
+train/validation/holdout bias safeguards. See
+`.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
 `docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003,
-ADR-004, ADR-005, ADR-006, ADR-007, `docs/CSV_INGESTION_CONTRACT.md`,
+ADR-004, ADR-005, ADR-006, ADR-007, ADR-009, `docs/CSV_INGESTION_CONTRACT.md`,
 `docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`,
 `docs/BACKTEST_MANIFEST_CONTRACT.md`, `docs/ENGINE_EXECUTION_CONTRACT.md`,
-and `docs/RESULT_ARTIFACT_AND_METRIC_CONTRACT.md`.
+`docs/RESULT_ARTIFACT_AND_METRIC_CONTRACT.md`, and
+`docs/OPTIMIZATION_AND_BIAS_SAFEGUARD_CONTRACT.md`.
 
 ## Engine execution
 
@@ -60,6 +63,38 @@ ever fabricated for a failed run. Retrieval is read-only:
   canonical run manifest plus provenance and checksums, exported as JSON.
 - `GET /api/v1/backtest-runs/{run_id}/comparison-compatibility?other_run_id=...`
   — `{compatible, reasons}` only; never a numeric cross-run ranking.
+
+## Optimization
+
+An optimizer (`app/domain/optimization.py`, `app/application/{optimization_manifest_service,execute_optimization_service}.py`,
+migration `0006_add_optimizations.sql`) searches only `sma_crossover.fast_window`/`slow_window`
+over an explicit finite integer grid, using chronological
+`train`/`validation`/`holdout` partitions (`train_end < validation_start <=
+validation_end < holdout_start <= holdout_end`, DB-checked and
+bar-coverage-checked at creation time). `POST /api/v1/optimizations`
+canonicalizes the grid `(fast_window, slow_window)` in stable lexicographic
+order, records invalid pairs (`fast_window >= slow_window`) as `rejected`
+candidates rather than silently dropping them, and rejects an oversized grid
+(`APP_OPTIMIZATION_MAX_CANDIDATE_COUNT`, default 50) before any candidate
+runs. `POST /api/v1/optimizations/{id}:execute` runs each pending candidate
+through a real train-period run and a real validation-period run (reusing
+TASK-006/007/008's existing manifest/execution/artifact paths — one new
+immutable strategy version per candidate), ranks only candidates with an
+`available` validation objective (never an `unavailable` one), tie-breaks
+deterministically (highest objective value, then lower `slow_window`, then
+lower `fast_window`, then candidate ID), and evaluates the selected
+candidate on holdout exactly once. `GET /api/v1/optimizations/{id}` seals
+holdout fields (`null`, `sealed: true`) until the optimization reaches
+`completed` — holdout can never influence selection, and reading it early is
+impossible even by the API, not just hidden by the UI.
+`GET /api/v1/optimizations/{id}/candidates` never includes holdout data. A
+candidate's train or validation run failing (e.g. `missing_next_bar`) does
+not abort the other candidates — it is recorded as a `failed` candidate with
+a reason, and the optimization proceeds. Lifecycle:
+`created → validating → running_train_validation → selecting →
+running_holdout → completed`, with `failed`/`cancelled` as terminal
+alternatives; only documented forward transitions are legal, and a second
+`:execute` call on a non-`created` optimization returns `409 conflict`.
 
 ## Strategies and backtest runs
 

@@ -10,7 +10,10 @@ list/detail dashboard (`/datasets`, `/datasets/import`,
 components (`components/data/`), and a precision-safe decimal display
 utility (`lib/format/decimal.ts`). TASK-011 adds strategy authoring
 (`/strategies`, `/strategies/new`, `/strategies/[strategy_id]/versions/[version]`)
-and JSON-body POST support in `lib/api/client.ts`.
+and JSON-body POST support in `lib/api/client.ts`. TASK-012 adds the
+optimization workflow (`/optimizations`, `/optimizations/new`,
+`/optimizations/[optimization_id]`) for the backend's chronological
+train/validation/holdout parameter optimizer.
 
 ## Prerequisites
 
@@ -66,6 +69,21 @@ Client checks are ergonomic only: the backend remains authoritative, and a
 server rejection preserves every entered value for retry. `/strategies/{id}/versions/{version}`
 renders the returned specification as read-only structured data (no inputs,
 no buttons) and never claims a strategy is profitable, active, or executable.
+
+## Optimization workflow
+
+`/optimizations/new` submits an explicit finite `fast_windows`/`slow_windows`
+grid, six chronological train/validation/holdout dates, and one predeclared
+objective metric — the same 9 keys as the run-artifact contract. The
+"candidate count" preview is pure combinatorics (counting `fast < slow`
+pairs client-side) — presentational, not a financial calculation. On
+`/optimizations/{id}`, the holdout section reads only the API's own
+`holdout.sealed` flag (never re-derived from `status` client-side): while
+sealed it renders a distinct `UnavailableState` instead of any holdout
+field, and only shows holdout run ID/objective once the backend itself
+reports the optimization `completed`. Rejected candidate pairs surface as an
+always-visible warning banner, not a collapsed count. The candidates table
+never requests more than one page at a time and never shows holdout data.
 
 ## Run the app
 

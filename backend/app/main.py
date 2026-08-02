@@ -10,6 +10,7 @@ from app.api.routes.backtest_runs import v1_backtest_runs_router
 from app.api.routes.datasets import v1_datasets_router
 from app.api.routes.health import liveness_router, v1_router
 from app.api.routes.instruments import v1_instruments_router
+from app.api.routes.optimizations import v1_optimizations_router
 from app.api.routes.readiness import v1_readiness_router
 from app.api.routes.run_artifacts import v1_run_artifacts_router
 from app.api.routes.strategies import v1_strategies_router
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     application.include_router(v1_strategies_router)
     application.include_router(v1_backtest_runs_router)
     application.include_router(v1_run_artifacts_router)
+    application.include_router(v1_optimizations_router)
 
     return application
 
