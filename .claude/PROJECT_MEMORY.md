@@ -2,7 +2,7 @@
 
 ## Status
 
-All planned tasks (`TASK-001` through `TASK-014`) are implemented and verified; see `RELEASE_NOTES.md` at the repository root for the exact v1 scope and known limitations. `TASK-001` established the foundation:
+All planned tasks (`TASK-001` through `TASK-015`) are implemented and verified; see `RELEASE_NOTES.md` at the repository root for the exact v1 scope and known limitations. `TASK-001` established the foundation:
 
 - Backend: FastAPI on Python 3.13, dependency-free `GET /health` returning `{"status":"ok"}`. Quality tooling: `ruff` (format + lint), `mypy --strict`, `pytest` (with `httpx` for `TestClient`). Direct dependencies pinned in `backend/requirements.txt` / `backend/requirements-dev.txt`.
 - Frontend: Next.js 16.2.12 (App Router) + React 19.2.4 + strict TypeScript, minimal accessible landing page at `/`. Quality tooling: ESLint (`eslint-config-next` + `eslint-config-prettier`), Prettier, `tsc --noEmit`, Vitest + Testing Library.

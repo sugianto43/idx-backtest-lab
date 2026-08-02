@@ -76,8 +76,10 @@ variables (`backend/.env.example`, `frontend/.env.example`) — see
 | `frontend/` | `npm run format` | `npm run lint` | `npm run type-check` | `npm run test` | `npm run build` |
 
 Both must pass, along with `docker compose build`, before any change is
-considered complete. See `.claude/CLAUDE.md` for the full working loop and
-`.claude/TASK_INDEX.md` for per-task verification evidence.
+considered complete. `.github/workflows/ci.yml` runs all of the above
+automatically on every push and pull request against `main`. See
+`.claude/CLAUDE.md` for the full working loop and `.claude/TASK_INDEX.md`
+for per-task verification evidence.
 
 ## AI-assisted development
 

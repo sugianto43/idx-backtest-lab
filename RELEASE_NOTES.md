@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-014)
+# Release Notes — v1 (TASK-001 through TASK-015)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -57,10 +57,12 @@ historical simulation only.
   research tool, not a hosted service.
 - **Local persistence only.** DuckDB is a single local file; there is no
   distributed execution, no concurrent-run scaling, and no managed backup.
-- **No CI pipeline or hosted deployment.** Quality gates
-  (`ruff`/`mypy`/`pytest`, `eslint`/`tsc`/`vitest`/`next build`) and Docker
-  builds are run and documented per task, but no continuous-integration
-  automation or production hosting exists in this repository.
+- **No hosted deployment.** `.github/workflows/ci.yml` (TASK-015)
+  automates every quality gate and both Docker builds on push/PR to
+  `main`, but no production hosting, container registry publishing, or
+  release automation exists in this repository. Branch-protection rules
+  requiring the CI workflow to pass before merge have not been configured
+  (a repository-settings change outside this codebase's scope).
 
 ## Verification evidence (TASK-013)
 
