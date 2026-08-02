@@ -115,3 +115,6 @@ historical simulation only.
   and correctly imported 6 real trading bars with fixed provenance
   (`source_name="Yahoo Finance"`, the personal/non-commercial license
   citation, `adjustment_policy="split_adjusted"`) — not a mocked response.
+- CI (`.github/workflows/ci.yml`) also passed on this task's own PR (#33):
+  backend 1m7s, frontend 52s, docker 35s —
+  https://github.com/sugianto43/idx-backtest-lab/actions/runs/30746336377.
