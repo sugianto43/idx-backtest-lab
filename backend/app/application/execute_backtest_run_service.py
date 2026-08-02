@@ -13,7 +13,9 @@ from app.application.errors import (
 from app.application.ports.backtest_run_repository import BacktestRunRepository
 from app.application.ports.bar_snapshot_repository import BarSnapshotRepository
 from app.application.ports.engine_execution_port import EngineExecutionPort
+from app.application.ports.run_artifact_writer import RunArtifactWriter
 from app.application.ports.strategy_spec_repository import StrategySpecRepository
+from app.application.run_artifact_builder import build_run_artifact
 from app.domain.backtest_manifest import parse_run_manifest
 from app.domain.backtest_run import BacktestRunStatus
 from app.domain.execution_result import ExecutionResult, TerminalStatus
@@ -32,6 +34,7 @@ def execute_backtest_run(
     *,
     id_factory: Callable[[], str],
     clock: Callable[[], datetime] = _default_clock,
+    artifact_writer: RunArtifactWriter | None = None,
 ) -> ExecutionResult:
     run = run_repository.get(run_id)
     if run is None:
@@ -129,6 +132,28 @@ def execute_backtest_run(
             expected_status=BacktestRunStatus.RUNNING,
             next_status=BacktestRunStatus.COMPLETED,
             finished_at_utc=clock(),
+        )
+
+    if artifact_writer is not None:
+        artifact = build_run_artifact(
+            run=run,
+            manifest=manifest,
+            strategy=strategy,
+            bars=bars,
+            result=result,
+            id_factory=id_factory,
+            clock=clock,
+        )
+        artifact_writer.persist(
+            bundle=artifact.bundle,
+            order_events=list(result.order_events),
+            fill_events=list(result.fill_events),
+            position_events=list(result.position_events),
+            cash_events=list(result.cash_events),
+            warnings=list(result.warnings),
+            snapshots=artifact.snapshots,
+            metrics=artifact.metrics,
+            reproducibility_manifest=artifact.reproducibility_manifest,
         )
 
     return result

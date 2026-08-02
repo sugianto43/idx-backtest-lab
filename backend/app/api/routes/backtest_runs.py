@@ -33,6 +33,7 @@ from app.infrastructure.db.backtest_run_repository import DuckDBBacktestRunRepos
 from app.infrastructure.db.bar_snapshot_repository import DuckDBBarSnapshotRepository
 from app.infrastructure.db.dataset_repository import DuckDBDatasetRepository
 from app.infrastructure.db.instrument_repository import DuckDBInstrumentRepository
+from app.infrastructure.db.run_artifact_writer import DuckDBRunArtifactWriter
 from app.infrastructure.db.strategy_spec_repository import DuckDBStrategySpecRepository
 from app.infrastructure.engine.backtrader_adapter import BacktraderEngineAdapter
 from app.infrastructure.settings import Settings, get_settings
@@ -148,6 +149,7 @@ def execute_backtest_run_endpoint(
             BacktraderEngineAdapter(),
             run_id,
             id_factory=lambda: uuid.uuid4().hex,
+            artifact_writer=DuckDBRunArtifactWriter(settings),
         )
     except (BacktestRunNotFoundError, StrategySpecNotFoundError) as exc:
         raise NotFoundError() from exc

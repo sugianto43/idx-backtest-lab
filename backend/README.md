@@ -1,17 +1,19 @@
 # Backend
 
-FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-007 provide
+FastAPI application for the idx-backtesting-lab API. TASK-001–TASK-008 provide
 the process skeleton, layered package boundaries (`api`, `application`,
 `domain`, `infrastructure`), health/readiness endpoints, typed configuration,
 structured logging with correlation IDs, a safe error envelope, a local
 DuckDB persistence boundary, offline provider-neutral CSV market-data
 ingestion, instrument/corporate-action identity records, immutable
-strategy/run-manifest validation, and a deterministic Backtrader execution
-adapter. See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
+strategy/run-manifest validation, a deterministic Backtrader execution
+adapter, and an immutable run-artifact/metrics/reproducibility audit trail.
+See `.claude/ARCHITECTURE_RULES.md`, `docs/TDD.md`,
 `docs/adr/ADR-002-local-persistence-and-schema-evolution.md`, ADR-003,
-ADR-004, ADR-005, ADR-006, `docs/CSV_INGESTION_CONTRACT.md`,
+ADR-004, ADR-005, ADR-006, ADR-007, `docs/CSV_INGESTION_CONTRACT.md`,
 `docs/INSTRUMENT_AND_CORPORATE_ACTION_CONTRACT.md`,
-`docs/BACKTEST_MANIFEST_CONTRACT.md`, and `docs/ENGINE_EXECUTION_CONTRACT.md`.
+`docs/BACKTEST_MANIFEST_CONTRACT.md`, `docs/ENGINE_EXECUTION_CONTRACT.md`,
+and `docs/RESULT_ARTIFACT_AND_METRIC_CONTRACT.md`.
 
 ## Engine execution
 
@@ -23,10 +25,41 @@ close (proven by `tests/test_backtrader_adapter.py`'s smoke fixture). If no
 next bar exists for an eligible signal, the whole run fails closed
 (`missing_next_bar`). The engine emits an in-memory, product-neutral
 `ExecutionResult` (orders/fills/positions/cash/warnings) — Backtrader types
-never cross the adapter boundary, and **no result is persisted or queryable**
-yet; the endpoint returns only event counts and a terminal status as an
-interim summary (TASK-008 adds durable artifacts and metrics). v1 supports
-exactly one instrument per run; multi-instrument manifests are rejected.
+never cross the adapter boundary. The execute endpoint itself still returns
+only event counts and a terminal status as an interim summary, but on the
+same call the run's full result is now persisted as an immutable artifact
+bundle (see below). v1 supports exactly one instrument per run;
+multi-instrument manifests are rejected.
+
+## Run artifacts, metrics, and reproducibility
+
+Every terminal run (`completed` or `failed`) gets exactly one immutable
+`run_artifact_bundle`, written by `DuckDBRunArtifactWriter`
+(`app/infrastructure/db/run_artifact_writer.py`) in a single transaction
+right after the run's status transition commits. A `failed` run's bundle
+persists its events/warnings only — no portfolio snapshots or metrics are
+ever fabricated for a failed run. Retrieval is read-only:
+
+- `GET /api/v1/backtest-runs/{run_id}/summary` — status, terminal status, and
+  all metrics in one call.
+- `GET /api/v1/backtest-runs/{run_id}/artifacts` — bundle metadata,
+  checksum, provenance (manifest/dataset/strategy/engine checksums), and
+  links to the sections below.
+- `GET /api/v1/backtest-runs/{run_id}/events?type={order|fill|position|cash|warning}&limit&offset`
+  — paginated event log, one type per call.
+- `GET /api/v1/backtest-runs/{run_id}/portfolio-snapshots?limit&offset` —
+  per-bar cash/holdings/equity valuation (v1: bar-close valuation only, no
+  forward-fill).
+- `GET /api/v1/backtest-runs/{run_id}/metrics` — all 8 v1 metrics
+  (`initial_equity`, `final_equity`, `total_return`, `annualized_return`,
+  `max_drawdown`, `trade_count`, `win_rate`, `realized_pnl`,
+  `exposure_time_ratio`), each `available` (with a `Decimal` value) or
+  `not_available` (with a reason) — never a fabricated/zero-substituted
+  value.
+- `GET /api/v1/backtest-runs/{run_id}/reproducibility-manifest` — the full
+  canonical run manifest plus provenance and checksums, exported as JSON.
+- `GET /api/v1/backtest-runs/{run_id}/comparison-compatibility?other_run_id=...`
+  — `{compatible, reasons}` only; never a numeric cross-run ranking.
 
 ## Strategies and backtest runs
 
