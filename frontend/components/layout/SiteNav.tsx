@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/datasets", label: "Datasets" },
   { href: "/runs", label: "Runs" },
   { href: "/strategies", label: "Strategies" },
+  { href: "/optimizations", label: "Optimizations" },
   { href: "/system", label: "System status" },
 ] as const;
 

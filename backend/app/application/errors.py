@@ -129,3 +129,35 @@ class RunArtifactNotFoundError(ApplicationError):
     def __init__(self, run_id: str) -> None:
         super().__init__(f"No artifact bundle exists for run: {run_id}")
         self.run_id = run_id
+
+
+class OptimizationNotFoundError(ApplicationError):
+    def __init__(self, optimization_id: str) -> None:
+        super().__init__(f"Optimization not found: {optimization_id}")
+        self.optimization_id = optimization_id
+
+
+class OptimizationNotEligibleError(ApplicationError):
+    def __init__(self, optimization_id: str, status: str) -> None:
+        super().__init__(
+            f"Optimization {optimization_id} is not eligible to execute (status={status})"
+        )
+        self.optimization_id = optimization_id
+        self.status = status
+
+
+class OptimizationInvalidTransitionError(ApplicationError):
+    def __init__(self, current: str, next_status: str) -> None:
+        super().__init__(f"Cannot transition optimization from {current} to {next_status}")
+        self.current = current
+        self.next_status = next_status
+
+
+class StaleOptimizationStatusError(ApplicationError):
+    def __init__(self, optimization_id: str, expected: str, actual: str) -> None:
+        super().__init__(
+            f"Optimization {optimization_id} expected status {expected} but found {actual}"
+        )
+        self.optimization_id = optimization_id
+        self.expected = expected
+        self.actual = actual
