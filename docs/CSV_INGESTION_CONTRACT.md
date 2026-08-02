@@ -1,5 +1,7 @@
 # CSV Ingestion Contract
 
+> **Internal contract, not a user-facing upload format.** Since ADR-011, there is no HTTP endpoint that accepts a user-supplied CSV file. This document now describes the byte format the Yahoo Finance provider adapter (ADR-010) produces internally and feeds through `ImportDatasetUseCase` — it remains the authoritative reference for that use case's validation rules and for any future provider adapter, per ADR-003.
+
 ## Scope
 
 This is the provider-neutral initial format for daily and intraday OHLCV import. A file represents one dataset version and must contain one header row plus data rows. The importer must reject ambiguous or malformed files rather than guessing semantics.

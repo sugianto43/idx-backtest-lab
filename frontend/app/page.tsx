@@ -4,7 +4,7 @@ const STEPS = [
   {
     number: 1,
     title: "Import a dataset",
-    description: "Upload CSV OHLCV data, or fetch it directly from Yahoo Finance.",
+    description: "Fetch daily OHLCV bars directly from Yahoo Finance by ticker.",
     href: "/datasets/import",
     linkLabel: "Import a dataset",
   },

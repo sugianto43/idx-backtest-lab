@@ -1,6 +1,6 @@
 # ADR-003: Provider-neutral local CSV ingestion
 
-- **Status:** Accepted
+- **Status:** Superseded in part by ADR-011 (the manual-upload HTTP endpoint described here was removed; the underlying CSV contract and validation pipeline remain and are used internally by the Yahoo Finance adapter per ADR-010)
 - **Date:** 2026-08-01
 
 ## Context

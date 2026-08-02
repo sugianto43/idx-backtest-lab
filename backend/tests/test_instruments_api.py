@@ -6,21 +6,12 @@ from fastapi.testclient import TestClient
 
 from app.infrastructure.settings import get_settings
 from app.main import create_app
+from tests.conftest import seed_dataset
 
 HEADER = "timestamp,instrument_identifier,open,high,low,close,volume"
 VALID_CSV = (
     HEADER + "\n2026-01-01,BBCA,100,105,99,104,1000\n2026-01-02,BBCA,104,110,103,109,1500\n"
 ).encode("utf-8")
-
-DATASET_METADATA = {
-    "name": "Sample dataset",
-    "source_name": "Manual export",
-    "license_reference": "user_supplied_unknown",
-    "bar_interval": "1d",
-    "timezone": "UTC",
-    "adjustment_policy": "raw",
-    "instrument_mapping_policy": "ticker_as_of_import",
-}
 
 
 @pytest.fixture(autouse=True)
@@ -52,15 +43,7 @@ def _create_instrument(client: TestClient, **overrides: Any) -> dict[str, Any]:
 
 
 def _create_dataset(client: TestClient) -> str:
-    response = client.post(
-        "/api/v1/datasets:import",
-        files={"file": ("prices.csv", VALID_CSV, "text/csv")},
-        data=DATASET_METADATA,
-    )
-    assert response.status_code == 201
-    dataset_id = response.json()["dataset_id"]
-    assert isinstance(dataset_id, str)
-    return dataset_id
+    return seed_dataset(get_settings(), raw_bytes=VALID_CSV)
 
 
 def test_create_and_get_instrument(client: TestClient) -> None:

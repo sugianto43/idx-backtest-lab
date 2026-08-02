@@ -130,32 +130,28 @@ identifier are rejected with `409 conflict`.
 
 ## Dataset import
 
-`POST /api/v1/datasets:import` (multipart: `file` + required metadata fields
-`name`, `source_name`, `license_reference`, `bar_interval`, `timezone`,
-`adjustment_policy`, `instrument_mapping_policy`; optional `source_reference`,
-`allow_reimport`) validates a CSV file against
-`docs/CSV_INGESTION_CONTRACT.md` exactly and fails the whole import on any
-violation. `GET /api/v1/datasets/{dataset_id}` and `GET /api/v1/datasets`
-expose provenance, validation status, and warnings — never raw bars or files.
-Both also expose `row_count`/`warning_count` (sourced from the dataset's
-latest import record) so the frontend dashboard can render them without a
-detail call per row. No corporate-action or ticker-resolution logic exists
-here; see TASK-005.
-
 `POST /api/v1/datasets:import-from-yahoo-finance` (JSON: `ticker`,
 `instrument_identifier` optional, `start_date`, `end_date`, `name`,
-`instrument_mapping_policy`, `allow_reimport` optional) is the one market-
-data provider adapter that exists (ADR-010): it fetches daily OHLCV from
-Yahoo Finance's public chart endpoint using only the standard library (no
-new dependency), converts it into exact `CSV_INGESTION_CONTRACT.md` bytes,
-and calls the *same* import use case `POST /api/v1/datasets:import` uses —
-no separate validation path. `source_name` (`"Yahoo Finance"`),
+`instrument_mapping_policy`, `allow_reimport` optional) is the only way to
+create a dataset (ADR-011 removed the earlier manual-CSV-upload endpoint;
+ADR-010 documents this adapter). It fetches daily OHLCV from Yahoo Finance's
+public chart endpoint using only the standard library (no new dependency),
+converts it into exact `docs/CSV_INGESTION_CONTRACT.md` bytes internally,
+and calls the import use case, which validates against that contract and
+fails the whole import on any violation. `source_name` (`"Yahoo Finance"`),
 `license_reference` (a fixed citation of Yahoo's Terms of Service —
 personal, non-commercial use only, redistribution prohibited), and
 `adjustment_policy` (`split_adjusted`, since Yahoo's `close` is split- but
 not dividend-adjusted) are fixed by this endpoint, never caller-supplied. A
 Yahoo fetch failure or an empty result returns `502 upstream_fetch_failed`
 — never a fabricated or partial dataset.
+
+`GET /api/v1/datasets/{dataset_id}` and `GET /api/v1/datasets` expose
+provenance, validation status, and warnings — never raw bars or files. Both
+also expose `row_count`/`warning_count` (sourced from the dataset's latest
+import record) so the frontend dashboard can render them without a detail
+call per row. No corporate-action or ticker-resolution logic exists here;
+see TASK-005.
 
 ## Configuration
 

@@ -6,21 +6,12 @@ from fastapi.testclient import TestClient
 
 from app.infrastructure.settings import get_settings
 from app.main import create_app
+from tests.conftest import seed_dataset
 
 HEADER = "timestamp,instrument_identifier,open,high,low,close,volume"
 VALID_CSV = (
     HEADER + "\n2020-01-01,BBCA,100,105,99,104,1000\n2020-01-02,BBCA,104,110,103,109,1500\n"
 ).encode("utf-8")
-
-DATASET_METADATA = {
-    "name": "Sample dataset",
-    "source_name": "Manual export",
-    "license_reference": "user_supplied_unknown",
-    "bar_interval": "1d",
-    "timezone": "UTC",
-    "adjustment_policy": "raw",
-    "instrument_mapping_policy": "ticker_as_of_import",
-}
 
 STRATEGY_PAYLOAD = {
     "name": "SMA crossover 10/30",
@@ -46,14 +37,7 @@ def client(tmp_path: Any, monkeypatch: Any) -> Iterator[TestClient]:
 
 
 def _setup_dataset(client: TestClient) -> str:
-    response = client.post(
-        "/api/v1/datasets:import",
-        files={"file": ("prices.csv", VALID_CSV, "text/csv")},
-        data=DATASET_METADATA,
-    )
-    assert response.status_code == 201
-    dataset_id: str = response.json()["dataset_id"]
-    return dataset_id
+    return seed_dataset(get_settings(), raw_bytes=VALID_CSV)
 
 
 def _setup_instrument(client: TestClient) -> str:
@@ -181,13 +165,7 @@ def test_get_backtest_run_reports_final_equity_after_execution(client: TestClien
         lines.append(f"2026-01-{day:02d},BBCA,{close - 0.5},{close + 1},{close - 1},{close},1000")
     csv_bytes = ("\n".join(lines) + "\n").encode("utf-8")
 
-    dataset = client.post(
-        "/api/v1/datasets:import",
-        files={"file": ("prices.csv", csv_bytes, "text/csv")},
-        data=DATASET_METADATA,
-    )
-    assert dataset.status_code == 201
-    dataset_id = dataset.json()["dataset_id"]
+    dataset_id = seed_dataset(get_settings(), raw_bytes=csv_bytes)
     instrument_id = _setup_instrument(client)
     strategy = client.post(
         "/api/v1/strategies",
