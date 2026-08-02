@@ -172,8 +172,12 @@ def list_datasets(
     settings: Settings = Depends(get_settings),
 ) -> DatasetListResponse:
     page = DuckDBDatasetRepository(settings).list(limit=limit, offset=offset)
-    return DatasetListResponse(
-        items=[
+    import_repository = DuckDBDatasetImportRepository(settings)
+
+    items = []
+    for dataset in page.items:
+        latest_import = import_repository.get_latest_for_dataset(dataset.dataset_id)
+        items.append(
             DatasetSummary(
                 dataset_id=dataset.dataset_id,
                 name=dataset.name,
@@ -189,10 +193,9 @@ def list_datasets(
                 validation_status=dataset.validation_status.value,
                 validation_summary=dataset.validation_summary,
                 created_at_utc=dataset.created_at_utc,
+                row_count=latest_import.accepted_row_count if latest_import else 0,
+                warning_count=latest_import.warning_count if latest_import else 0,
             )
-            for dataset in page.items
-        ],
-        total=page.total,
-        limit=page.limit,
-        offset=page.offset,
-    )
+        )
+
+    return DatasetListResponse(items=items, total=page.total, limit=page.limit, offset=page.offset)

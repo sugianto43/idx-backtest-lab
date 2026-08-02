@@ -113,6 +113,12 @@ def test_create_backtest_run_returns_201(client: TestClient) -> None:
     assert body["status"] == "created"
     assert body["manifest_checksum"].startswith("sha256:")
     assert body["manifest"]["universe"]["instrument_ids"] == [instrument_id]
+    assert body["final_equity"] == {
+        "status": "not_available",
+        "value": None,
+        "reason": "run_not_yet_executed",
+    }
+    assert body["total_return"]["status"] == "not_available"
 
 
 def test_create_backtest_run_unknown_strategy_returns_404(client: TestClient) -> None:
@@ -165,6 +171,72 @@ def test_get_backtest_run_round_trip(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["manifest_checksum"] == created["manifest_checksum"]
+
+
+def test_get_backtest_run_reports_final_equity_after_execution(client: TestClient) -> None:
+    closes = [10, 9, 8, 12, 16, 20, 8, 4, 2, 2]
+    lines = [HEADER]
+    for i, close in enumerate(closes):
+        day = i + 1
+        lines.append(f"2026-01-{day:02d},BBCA,{close - 0.5},{close + 1},{close - 1},{close},1000")
+    csv_bytes = ("\n".join(lines) + "\n").encode("utf-8")
+
+    dataset = client.post(
+        "/api/v1/datasets:import",
+        files={"file": ("prices.csv", csv_bytes, "text/csv")},
+        data=DATASET_METADATA,
+    )
+    assert dataset.status_code == 201
+    dataset_id = dataset.json()["dataset_id"]
+    instrument_id = _setup_instrument(client)
+    strategy = client.post(
+        "/api/v1/strategies",
+        json={
+            "name": "SMA crossover 2/3",
+            "kind": "sma_crossover",
+            "parameters": {"fast_window": 2, "slow_window": 3, "price_field": "close"},
+            "signal_policy": {
+                "signal_time": "bar_close",
+                "eligible_after_bars": 3,
+                "long_only": True,
+            },
+        },
+    )
+    assert strategy.status_code == 201
+    strategy_id = strategy.json()["strategy_id"]
+    mapping = client.post(
+        f"/api/v1/datasets/{dataset_id}/instrument-mappings",
+        json={
+            "source_instrument_identifier": "BBCA",
+            "instrument_id": instrument_id,
+            "effective_from": "2026-01-01",
+            "decision_source": "manual_review",
+        },
+    )
+    assert mapping.status_code == 201
+    created = client.post(
+        "/api/v1/backtest-runs",
+        json=_run_payload(
+            strategy_id,
+            dataset_id,
+            instrument_id,
+            start_date="2026-01-01",
+            end_date=f"2026-01-{len(closes):02d}",
+            position_sizing_fraction="0.50",
+        ),
+    ).json()
+    run_id = created["run_id"]
+
+    execution = client.post(f"/api/v1/backtest-runs/{run_id}:execute")
+    assert execution.status_code == 200
+
+    response = client.get(f"/api/v1/backtest-runs/{run_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["final_equity"]["status"] == "available"
+    assert body["final_equity"]["value"] is not None
+    assert body["total_return"]["status"] == "available"
 
 
 def test_get_unknown_backtest_run_returns_404(client: TestClient) -> None:

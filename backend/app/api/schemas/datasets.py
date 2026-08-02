@@ -39,11 +39,11 @@ class DatasetSummary(BaseModel):
     validation_status: str
     validation_summary: str | None
     created_at_utc: datetime
+    row_count: int
+    warning_count: int
 
 
 class DatasetDetailResponse(DatasetSummary):
-    row_count: int
-    warning_count: int
     warnings: list[DatasetWarning]
 
 

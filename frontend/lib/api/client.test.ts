@@ -114,6 +114,44 @@ describe("apiFetch", () => {
         code: "dependency_unavailable",
         correlationId: "corr-2",
         status: 503,
+        details: [],
+      },
+    });
+  });
+
+  it("sends a POST with a FormData body and surfaces documented details", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            code: "conflict",
+            message: "An identical dataset has already been imported.",
+            details: [{ existing_dataset_id: "ds-1" }],
+            correlation_id: "corr-3",
+          },
+        },
+        { status: 409 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const body = new FormData();
+    body.set("name", "Sample");
+
+    const result = await apiFetch("/api/v1/datasets:import", { method: "POST", body });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:8000/api/v1/datasets:import",
+      expect.objectContaining({ method: "POST", body }),
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: "api_error",
+        message: "An identical dataset has already been imported.",
+        code: "conflict",
+        correlationId: "corr-3",
+        status: 409,
+        details: [{ existing_dataset_id: "ds-1" }],
       },
     });
   });

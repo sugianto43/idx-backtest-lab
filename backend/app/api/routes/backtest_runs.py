@@ -9,6 +9,7 @@ from app.api.schemas.backtest_runs import (
     BacktestRunResponse,
     CreateBacktestRunRequest,
     ExecuteBacktestRunResponse,
+    RunMetricValue,
 )
 from app.application.backtest_run_manifest_service import (
     CreateRunManifestRequest,
@@ -29,10 +30,12 @@ from app.application.errors import (
 from app.application.execute_backtest_run_service import execute_backtest_run
 from app.domain.backtest_manifest import RunManifestValidationError
 from app.domain.backtest_run import RunManifest
+from app.domain.run_artifact import MetricRecord
 from app.infrastructure.db.backtest_run_repository import DuckDBBacktestRunRepository
 from app.infrastructure.db.bar_snapshot_repository import DuckDBBarSnapshotRepository
 from app.infrastructure.db.dataset_repository import DuckDBDatasetRepository
 from app.infrastructure.db.instrument_repository import DuckDBInstrumentRepository
+from app.infrastructure.db.run_artifact_repository import DuckDBRunArtifactRepository
 from app.infrastructure.db.run_artifact_writer import DuckDBRunArtifactWriter
 from app.infrastructure.db.strategy_spec_repository import DuckDBStrategySpecRepository
 from app.infrastructure.engine.backtrader_adapter import BacktraderEngineAdapter
@@ -59,7 +62,24 @@ class RunExecutionRejectedError(AppError):
     message = "The run could not be executed."
 
 
-def _run_response(run: RunManifest) -> BacktestRunResponse:
+def _run_metric_value(
+    metrics: list[MetricRecord], metric_key: str, *, bundle_exists: bool
+) -> RunMetricValue:
+    match = next((metric for metric in metrics if metric.metric_key == metric_key), None)
+    if match is None:
+        reason = "run_not_yet_executed" if not bundle_exists else "metric_not_computed"
+        return RunMetricValue(status="not_available", value=None, reason=reason)
+    return RunMetricValue(
+        status=match.status.value,
+        value=str(match.value) if match.value is not None else None,
+        reason=match.reason,
+    )
+
+
+def _run_response(run: RunManifest, settings: Settings) -> BacktestRunResponse:
+    artifact_repository = DuckDBRunArtifactRepository(settings)
+    bundle = artifact_repository.get_bundle(run.run_id)
+    metrics = artifact_repository.list_metrics(run.run_id)
     return BacktestRunResponse(
         run_id=run.run_id,
         dataset_id=run.dataset_id,
@@ -71,6 +91,8 @@ def _run_response(run: RunManifest) -> BacktestRunResponse:
         manifest=json.loads(run.configuration_json),
         warning_count=run.warning_count,
         created_at_utc=run.created_at_utc,
+        final_equity=_run_metric_value(metrics, "final_equity", bundle_exists=bundle is not None),
+        total_return=_run_metric_value(metrics, "total_return", bundle_exists=bundle is not None),
     )
 
 
@@ -107,7 +129,7 @@ def create_backtest_run(
     except (RunManifestValidationError, DecimalFieldError) as exc:
         code = getattr(exc, "code", "invalid_manifest")
         raise RunManifestValidationHttpError(details=[{"code": code, "message": str(exc)}]) from exc
-    return _run_response(run)
+    return _run_response(run, settings)
 
 
 @v1_backtest_runs_router.get("/backtest-runs", response_model=BacktestRunListResponse)
@@ -118,7 +140,7 @@ def list_backtest_runs(
 ) -> BacktestRunListResponse:
     page = DuckDBBacktestRunRepository(settings).list(limit=limit, offset=offset)
     return BacktestRunListResponse(
-        items=[_run_response(run) for run in page.items],
+        items=[_run_response(run, settings) for run in page.items],
         total=page.total,
         limit=page.limit,
         offset=page.offset,
@@ -132,7 +154,7 @@ def get_backtest_run(
     run = DuckDBBacktestRunRepository(settings).get(run_id)
     if run is None:
         raise NotFoundError()
-    return _run_response(run)
+    return _run_response(run, settings)
 
 
 @v1_backtest_runs_router.post(

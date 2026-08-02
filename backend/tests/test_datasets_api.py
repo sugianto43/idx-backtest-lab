@@ -129,3 +129,14 @@ def test_list_datasets_paginates(client: TestClient) -> None:
     assert body["total"] == 2
     assert len(body["items"]) == 1
     assert body["limit"] == 1
+
+
+def test_list_datasets_includes_row_and_warning_counts(client: TestClient) -> None:
+    imported = _import(client, adjustment_policy="unknown").json()
+
+    response = client.get("/api/v1/datasets", params={"limit": 20, "offset": 0})
+
+    assert response.status_code == 200
+    item = next(i for i in response.json()["items"] if i["dataset_id"] == imported["dataset_id"])
+    assert item["row_count"] == imported["accepted_row_count"]
+    assert item["warning_count"] == imported["warning_count"]

@@ -73,7 +73,13 @@ result is produced here** (TASK-007). Most v1 execution-assumption fields
 (commission/tax/slippage `none`, liquidity/price-limit `ignore_with_warning`,
 signal/fill timing, benchmark `none`) are fixed constants materialized into
 every manifest rather than caller-configurable inputs, since the contract
-defines exactly one supported value for each in v1.
+defines exactly one supported value for each in v1. `GET /api/v1/backtest-runs`
+and `GET /api/v1/backtest-runs/{run_id}` also expose `final_equity` and
+`total_return` (each `{status, value, reason}`, matching TASK-008's metric
+status contract) so the frontend dashboard can list run outcomes without an
+extra per-row call — `reason` is `run_not_yet_executed` before the run has
+an artifact bundle, or `metric_not_computed` if a bundle exists without that
+metric.
 
 ## Instruments and corporate actions
 
@@ -96,8 +102,10 @@ identifier are rejected with `409 conflict`.
 `docs/CSV_INGESTION_CONTRACT.md` exactly and fails the whole import on any
 violation. `GET /api/v1/datasets/{dataset_id}` and `GET /api/v1/datasets`
 expose provenance, validation status, and warnings — never raw bars or files.
-No market-data provider, corporate-action, or ticker-resolution logic exists
-here; see TASK-005.
+Both also expose `row_count`/`warning_count` (sourced from the dataset's
+latest import record) so the frontend dashboard can render them without a
+detail call per row. No market-data provider, corporate-action, or
+ticker-resolution logic exists here; see TASK-005.
 
 ## Configuration
 
