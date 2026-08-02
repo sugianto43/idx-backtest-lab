@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.errors import AppError, NotFoundError
 from app.api.schemas.datasets import (
@@ -11,7 +11,7 @@ from app.api.schemas.datasets import (
 )
 from app.application.dataset_import_service import ImportDatasetRequest, ImportDatasetUseCase
 from app.application.errors import DatasetReimportConflictError
-from app.domain.dataset import DatasetValidationStatus, InstrumentMappingPolicy
+from app.domain.dataset import DatasetValidationStatus
 from app.domain.market_data import DatasetImport
 from app.infrastructure.db.dataset_import_repository import DuckDBDatasetImportRepository
 from app.infrastructure.db.dataset_import_writer import DuckDBDatasetImportWriter
@@ -30,12 +30,6 @@ from app.infrastructure.market_data.yahoo_finance_provider import (
 from app.infrastructure.settings import Settings, get_settings
 
 v1_datasets_router = APIRouter(prefix="/api/v1")
-
-
-class UploadTooLargeError(AppError):
-    code = "payload_too_large"
-    status_code = status.HTTP_413_CONTENT_TOO_LARGE
-    message = "The uploaded file exceeds the maximum allowed size."
 
 
 class DatasetImportRejectedError(AppError):
@@ -89,53 +83,6 @@ def _import_response_or_raise(result: DatasetImport) -> DatasetImportResponse:
         started_at_utc=result.started_at_utc,
         finished_at_utc=result.finished_at_utc,
     )
-
-
-@v1_datasets_router.post(
-    "/datasets:import",
-    response_model=DatasetImportResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def import_dataset(
-    file: UploadFile = File(...),
-    name: str = Form(...),
-    source_name: str = Form(...),
-    license_reference: str = Form(...),
-    bar_interval: str = Form(...),
-    timezone: str = Form(...),
-    adjustment_policy: str = Form(...),
-    instrument_mapping_policy: InstrumentMappingPolicy = Form(...),
-    source_reference: str | None = Form(None),
-    allow_reimport: bool = Form(False),
-    use_case: ImportDatasetUseCase = Depends(_get_use_case),
-) -> DatasetImportResponse:
-    raw_bytes = file.file.read()
-
-    if len(raw_bytes) > 10 * 1024 * 1024:
-        raise UploadTooLargeError()
-
-    try:
-        result = use_case.execute(
-            ImportDatasetRequest(
-                raw_bytes=raw_bytes,
-                filename=file.filename or "upload.csv",
-                name=name,
-                source_name=source_name,
-                license_reference=license_reference,
-                bar_interval=bar_interval,
-                timezone=timezone,
-                adjustment_policy=adjustment_policy,
-                instrument_mapping_policy=instrument_mapping_policy,
-                source_reference=source_reference,
-                allow_reimport=allow_reimport,
-            )
-        )
-    except DatasetReimportConflictError as exc:
-        raise DatasetConflictError(
-            details=[{"existing_dataset_id": exc.existing_dataset_id}]
-        ) from exc
-
-    return _import_response_or_raise(result)
 
 
 @v1_datasets_router.post(

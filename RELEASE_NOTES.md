@@ -1,4 +1,4 @@
-# Release Notes — v1 (TASK-001 through TASK-016)
+# Release Notes — v1 (TASK-001 through TASK-018)
 
 This is a local-first research tool for generating auditable evidence about
 a single declarative trading strategy against historical Indonesian equity
@@ -8,8 +8,10 @@ historical simulation only.
 
 ## What v1 can do
 
-- Import provider-neutral daily OHLCV CSV data with strict validation,
-  immutable versioning per import, and full provenance.
+- Import daily OHLCV data by ticker directly from Yahoo Finance (personal,
+  non-commercial use only — see ADR-010/ADR-011), with strict validation,
+  immutable versioning per import, and full provenance. There is no manual
+  CSV upload path as of TASK-018.
 - Define stable instrument identities and effective-dated ticker aliases;
   map a dataset's raw identifiers to an instrument for a declared date
   range.
@@ -132,3 +134,26 @@ appropriate for this local-only, single-user, no-auth tool. Verified with
 a real `OPTIONS` preflight against the rebuilt running container
 (`access-control-allow-origin: *` now present) and `tests/test_cors.py`
 (3 new backend tests, 292 total passing).
+
+## Verification evidence (TASK-017)
+
+- Frontend: `npm run format`/`lint`/`type-check` clean, `npm run test` — 92
+  passed across 23 files, `npm run build` succeeds (13 routes). No new
+  dependency added; every existing route's DOM/accessibility structure is
+  unchanged.
+- `docker compose build web` succeeds; SSR `curl` checks against the
+  rebuilt container confirmed the new header brand link, nav
+  `aria-current="page"`, and card/table classes render.
+
+## Verification evidence (TASK-018)
+
+- Backend: `ruff format --check .`, `ruff check .`, `mypy .`, `pytest -q`
+  — all clean, 287 tests passed (the manual-CSV-upload HTTP tests were
+  removed/replaced with Yahoo-Finance-only coverage; CSV-contract and
+  reimport-conflict behavior remain fully covered at the service layer in
+  `test_dataset_import_service.py`, untouched by this task).
+- Frontend: `npm run format`/`lint`/`type-check` clean, `npm run test` — 92
+  passed across 23 files, `npm run build` succeeds (13 routes).
+- `docs/adr/ADR-011-remove-manual-csv-import.md` records the decision as a
+  deliberate partial reversal of ADR-003; `docs/adr/ADR-003-...md`'s status
+  line now notes the partial supersession.

@@ -57,38 +57,22 @@ export function fetchDataset(datasetId: string): Promise<ApiResult<DatasetDetail
   return apiFetch<DatasetDetailResponse>(`/api/v1/datasets/${encodeURIComponent(datasetId)}`);
 }
 
-export interface ImportDatasetFields {
-  file: File;
+export interface ImportFromYahooFinanceFields {
+  ticker: string;
+  instrument_identifier?: string;
+  start_date: string;
+  end_date: string;
   name: string;
-  source_name: string;
-  license_reference: string;
-  bar_interval: string;
-  timezone: string;
-  adjustment_policy: string;
   instrument_mapping_policy: string;
-  source_reference?: string;
   allow_reimport?: boolean;
 }
 
-/** Sends exactly the CSV_INGESTION_CONTRACT metadata fields plus the file. */
-export function importDataset(
-  fields: ImportDatasetFields,
+export function importDatasetFromYahooFinance(
+  fields: ImportFromYahooFinanceFields,
 ): Promise<ApiResult<DatasetImportResponse>> {
-  const body = new FormData();
-  body.set("file", fields.file);
-  body.set("name", fields.name);
-  body.set("source_name", fields.source_name);
-  body.set("license_reference", fields.license_reference);
-  body.set("bar_interval", fields.bar_interval);
-  body.set("timezone", fields.timezone);
-  body.set("adjustment_policy", fields.adjustment_policy);
-  body.set("instrument_mapping_policy", fields.instrument_mapping_policy);
-  if (fields.source_reference) body.set("source_reference", fields.source_reference);
-  if (fields.allow_reimport) body.set("allow_reimport", "true");
-
-  return apiFetch<DatasetImportResponse>("/api/v1/datasets:import", {
+  return apiFetch<DatasetImportResponse>("/api/v1/datasets:import-from-yahoo-finance", {
     method: "POST",
-    body,
+    json: fields,
     timeoutMs: 30000,
   });
 }

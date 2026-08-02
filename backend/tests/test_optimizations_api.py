@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.infrastructure.settings import get_settings
 from app.main import create_app
+from tests.conftest import seed_dataset
 
 HEADER = "timestamp,instrument_identifier,open,high,low,close,volume"
 
@@ -28,17 +29,6 @@ def _csv_bytes() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-DATASET_METADATA = {
-    "name": "Sample dataset",
-    "source_name": "Manual export",
-    "license_reference": "user_supplied_unknown",
-    "bar_interval": "1d",
-    "timezone": "UTC",
-    "adjustment_policy": "raw",
-    "instrument_mapping_policy": "ticker_as_of_import",
-}
-
-
 @pytest.fixture(autouse=True)
 def _reset_settings_cache() -> Iterator[None]:
     get_settings.cache_clear()
@@ -55,13 +45,7 @@ def client(tmp_path: Any, monkeypatch: Any) -> Iterator[TestClient]:
 
 
 def _setup_dataset_and_instrument(client: TestClient) -> tuple[str, str]:
-    dataset = client.post(
-        "/api/v1/datasets:import",
-        files={"file": ("prices.csv", _csv_bytes(), "text/csv")},
-        data=DATASET_METADATA,
-    )
-    assert dataset.status_code == 201
-    dataset_id = dataset.json()["dataset_id"]
+    dataset_id = seed_dataset(get_settings(), raw_bytes=_csv_bytes())
 
     instrument = client.post(
         "/api/v1/instruments",

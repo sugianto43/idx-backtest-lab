@@ -25,6 +25,7 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-015 | Continuous integration pipeline | Completed | TASK-001–TASK-014 |
 | TASK-016 | Yahoo Finance market data import | Completed | TASK-004 |
 | TASK-017 | Visual design system and onboarding home page | Completed | TASK-009–TASK-014 |
+| TASK-018 | Remove manual CSV import; Yahoo Finance ticker import only | Completed | TASK-016 |
 
 ## Task template
 

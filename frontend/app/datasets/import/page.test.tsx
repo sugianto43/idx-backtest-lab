@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import DatasetImportPage from "./page";
-import { importDataset } from "@/lib/api/datasets";
+import { importDatasetFromYahooFinance } from "@/lib/api/datasets";
 
 const push = vi.fn();
 
@@ -10,50 +10,42 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/api/datasets", () => ({
-  importDataset: vi.fn(),
+  importDatasetFromYahooFinance: vi.fn(),
 }));
 
-const mockedImportDataset = vi.mocked(importDataset);
+const mockedImport = vi.mocked(importDatasetFromYahooFinance);
 
 function fillRequiredFields() {
-  fireEvent.change(screen.getByLabelText("Dataset name"), { target: { value: "Sample" } });
-  fireEvent.change(screen.getByLabelText("Source name"), { target: { value: "Manual export" } });
-  fireEvent.change(screen.getByLabelText("License reference"), {
-    target: { value: "user_supplied_unknown" },
+  fireEvent.change(screen.getByLabelText("Yahoo Finance ticker"), {
+    target: { value: "BBCA.JK" },
   });
-  const file = new File(
-    ["timestamp,instrument_identifier,open,high,low,close,volume"],
-    "prices.csv",
-    {
-      type: "text/csv",
-    },
-  );
-  fireEvent.change(screen.getByLabelText(/CSV file/), { target: { files: [file] } });
+  fireEvent.change(screen.getByLabelText("Dataset name"), { target: { value: "Sample" } });
 }
 
 describe("DatasetImportPage", () => {
-  it("blocks submission client-side when no file is selected, without calling the API", () => {
+  it("blocks submission client-side when required fields are missing, without calling the API", () => {
     render(<DatasetImportPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Import dataset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch from Yahoo Finance" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/select a csv file/i);
-    expect(mockedImportDataset).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/ticker and dataset name/i);
+    expect(mockedImport).not.toHaveBeenCalled();
   });
 
-  it("blocks submission client-side when required text fields are missing, without calling the API", () => {
+  it("blocks submission client-side when the start date is not before the end date", () => {
     render(<DatasetImportPage />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("End date"), { target: { value: "2025-01-01" } });
 
-    const file = new File(["timestamp"], "prices.csv", { type: "text/csv" });
-    fireEvent.change(screen.getByLabelText(/CSV file/), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Import dataset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch from Yahoo Finance" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/required/i);
-    expect(mockedImportDataset).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/start date must be before end date/i);
+    expect(mockedImport).not.toHaveBeenCalled();
   });
 
-  it("submits exactly the contract fields and routes to the new dataset on success", async () => {
-    mockedImportDataset.mockResolvedValue({
+  it("submits the ticker fields and routes to the new dataset on success", async () => {
+    mockedImport.mockResolvedValue({
       ok: true,
       data: {
         import_id: "imp-1",
@@ -69,24 +61,20 @@ describe("DatasetImportPage", () => {
 
     render(<DatasetImportPage />);
     fillRequiredFields();
-    fireEvent.click(screen.getByRole("button", { name: "Import dataset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch from Yahoo Finance" }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/datasets/ds-1"));
-    expect(mockedImportDataset).toHaveBeenCalledWith(
+    expect(mockedImport).toHaveBeenCalledWith(
       expect.objectContaining({
+        ticker: "BBCA.JK",
         name: "Sample",
-        source_name: "Manual export",
-        license_reference: "user_supplied_unknown",
-        bar_interval: "1d",
-        timezone: "UTC",
-        adjustment_policy: "raw",
         instrument_mapping_policy: "ticker_as_of_import",
       }),
     );
   });
 
   it("preserves entered values and shows a safe server error on conflict", async () => {
-    mockedImportDataset.mockResolvedValue({
+    mockedImport.mockResolvedValue({
       ok: false,
       error: {
         kind: "api_error",
@@ -99,7 +87,7 @@ describe("DatasetImportPage", () => {
 
     render(<DatasetImportPage />);
     fillRequiredFields();
-    fireEvent.click(screen.getByRole("button", { name: "Import dataset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch from Yahoo Finance" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByDisplayValue("Sample")).toBeInTheDocument();

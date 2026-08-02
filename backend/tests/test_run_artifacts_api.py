@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.infrastructure.settings import get_settings
 from app.main import create_app
+from tests.conftest import seed_dataset
 
 HEADER = "timestamp,instrument_identifier,open,high,low,close,volume"
 CLOSES = [10, 9, 8, 12, 16, 20, 8, 4, 2, 2]
@@ -19,16 +20,6 @@ def _csv_bytes() -> bytes:
         lines.append(f"2026-01-{day:02d},BBCA,{open_},{close + 1},{close - 1},{close},1000")
     return ("\n".join(lines) + "\n").encode("utf-8")
 
-
-DATASET_METADATA = {
-    "name": "Sample dataset",
-    "source_name": "Manual export",
-    "license_reference": "user_supplied_unknown",
-    "bar_interval": "1d",
-    "timezone": "UTC",
-    "adjustment_policy": "raw",
-    "instrument_mapping_policy": "ticker_as_of_import",
-}
 
 STRATEGY_PAYLOAD = {
     "name": "SMA crossover 2/3",
@@ -59,13 +50,7 @@ _shared_setup: dict[str, str] = {}
 
 def _setup_run(client: TestClient, *, import_dataset: bool = True) -> str:
     if import_dataset or not _shared_setup:
-        dataset = client.post(
-            "/api/v1/datasets:import",
-            files={"file": ("prices.csv", _csv_bytes(), "text/csv")},
-            data=DATASET_METADATA,
-        )
-        assert dataset.status_code == 201
-        dataset_id = dataset.json()["dataset_id"]
+        dataset_id = seed_dataset(get_settings(), raw_bytes=_csv_bytes())
 
         instrument = client.post(
             "/api/v1/instruments",

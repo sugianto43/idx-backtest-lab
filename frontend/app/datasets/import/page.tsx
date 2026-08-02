@@ -6,31 +6,29 @@ import { type FormEvent, useState } from "react";
 import { Disclaimer } from "@/components/layout/Disclaimer";
 import { ErrorState } from "@/components/status/ErrorState";
 import { LoadingState } from "@/components/status/LoadingState";
-import { importDataset } from "@/lib/api/datasets";
+import { importDatasetFromYahooFinance } from "@/lib/api/datasets";
 import type { ApiError } from "@/lib/api/types";
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-
 interface FormState {
+  ticker: string;
+  instrumentIdentifier: string;
   name: string;
-  sourceName: string;
-  sourceReference: string;
-  licenseReference: string;
-  barInterval: string;
-  timezone: string;
-  adjustmentPolicy: string;
+  startDate: string;
+  endDate: string;
   instrumentMappingPolicy: string;
   allowReimport: boolean;
 }
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 const INITIAL_FORM: FormState = {
+  ticker: "",
+  instrumentIdentifier: "",
   name: "",
-  sourceName: "",
-  sourceReference: "",
-  licenseReference: "",
-  barInterval: "1d",
-  timezone: "UTC",
-  adjustmentPolicy: "raw",
+  startDate: "2015-01-01",
+  endDate: today(),
   instrumentMappingPolicy: "ticker_as_of_import",
   allowReimport: false,
 };
@@ -47,7 +45,6 @@ function detailText(details: unknown[] | undefined): string | null {
 export default function DatasetImportPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
-  const [file, setFile] = useState<File | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -57,29 +54,22 @@ export default function DatasetImportPage() {
     setClientError(null);
     setSubmitError(null);
 
-    if (!file) {
-      setClientError("Select a CSV file to import.");
+    if (!form.ticker.trim() || !form.name.trim()) {
+      setClientError("Ticker and dataset name are required.");
       return;
     }
-    if (file.size > MAX_FILE_BYTES) {
-      setClientError("This file is larger than the 10 MB limit the server enforces.");
-      return;
-    }
-    if (!form.name.trim() || !form.sourceName.trim() || !form.licenseReference.trim()) {
-      setClientError("Name, source name, and license reference are required.");
+    if (form.startDate >= form.endDate) {
+      setClientError("Start date must be before end date.");
       return;
     }
 
     setSubmitting(true);
-    const result = await importDataset({
-      file,
+    const result = await importDatasetFromYahooFinance({
+      ticker: form.ticker.trim(),
+      instrument_identifier: form.instrumentIdentifier.trim() || undefined,
+      start_date: form.startDate,
+      end_date: form.endDate,
       name: form.name,
-      source_name: form.sourceName,
-      source_reference: form.sourceReference || undefined,
-      license_reference: form.licenseReference,
-      bar_interval: form.barInterval,
-      timezone: form.timezone,
-      adjustment_policy: form.adjustmentPolicy,
       instrument_mapping_policy: form.instrumentMappingPolicy,
       allow_reimport: form.allowReimport,
     });
@@ -99,28 +89,32 @@ export default function DatasetImportPage() {
       <h1>Import a dataset</h1>
       <Disclaimer />
       <p>
-        Submitting this form creates a new, immutable dataset version — it never overwrites an
-        existing one. See the{" "}
+        Fetches daily OHLCV bars directly from Yahoo Finance for the given ticker. Submitting this
+        form creates a new, immutable dataset version — it never overwrites an existing one. See{" "}
         <a
-          href="https://github.com/sugianto43/idx-backtest-lab/blob/main/docs/CSV_INGESTION_CONTRACT.md"
+          href="https://github.com/sugianto43/idx-backtest-lab/blob/main/docs/adr/ADR-011-remove-manual-csv-import.md"
           target="_blank"
           rel="noreferrer"
         >
-          CSV ingestion contract
+          ADR-011
         </a>{" "}
-        for the exact file format. Client-side checks below are a convenience only — the server
-        validates authoritatively.
+        for the personal/non-commercial-use terms this import relies on.
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
         <div>
-          <label htmlFor="file">CSV file (max 10 MB)</label>
+          <label htmlFor="ticker">Yahoo Finance ticker</label>
           <input
-            id="file"
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            id="ticker"
+            value={form.ticker}
+            onChange={(event) => setForm({ ...form, ticker: event.target.value })}
+            placeholder="BBCA.JK"
+            required
+            aria-describedby="ticker-help"
           />
+          <p id="ticker-help">
+            Use the Yahoo Finance symbol, e.g. <code>BBCA.JK</code> for an IDX-listed stock.
+          </p>
         </div>
 
         <div>
@@ -134,82 +128,38 @@ export default function DatasetImportPage() {
         </div>
 
         <div>
-          <label htmlFor="source_name">Source name</label>
+          <label htmlFor="instrument_identifier">Instrument identifier (optional)</label>
           <input
-            id="source_name"
-            value={form.sourceName}
-            onChange={(event) => setForm({ ...form, sourceName: event.target.value })}
-            required
+            id="instrument_identifier"
+            value={form.instrumentIdentifier}
+            onChange={(event) => setForm({ ...form, instrumentIdentifier: event.target.value })}
+            aria-describedby="instrument_identifier-help"
           />
-          <p id="source_name-help">Human-readable legal/source label.</p>
-        </div>
-
-        <div>
-          <label htmlFor="source_reference">Source reference (optional)</label>
-          <input
-            id="source_reference"
-            value={form.sourceReference}
-            onChange={(event) => setForm({ ...form, sourceReference: event.target.value })}
-          />
-          <p id="source_reference-help">Provider/export reference. Never include credentials.</p>
-        </div>
-
-        <div>
-          <label htmlFor="license_reference">License reference</label>
-          <input
-            id="license_reference"
-            value={form.licenseReference}
-            onChange={(event) => setForm({ ...form, licenseReference: event.target.value })}
-            required
-            aria-describedby="license_reference-help"
-          />
-          <p id="license_reference-help">
-            A URL/text reference to applicable terms, or the literal value{" "}
-            <code>user_supplied_unknown</code>.
+          <p id="instrument_identifier-help">
+            Defaults to the ticker if left blank. Used to map bars to an instrument.
           </p>
         </div>
 
         <div>
-          <label htmlFor="bar_interval">Bar interval</label>
+          <label htmlFor="start_date">Start date</label>
           <input
-            id="bar_interval"
-            value={form.barInterval}
-            onChange={(event) => setForm({ ...form, barInterval: event.target.value })}
+            id="start_date"
+            type="date"
+            value={form.startDate}
+            onChange={(event) => setForm({ ...form, startDate: event.target.value })}
             required
-            aria-describedby="bar_interval-help"
           />
-          <p id="bar_interval-help">Canonical interval, e.g. 1d, 1h, 5m.</p>
         </div>
 
         <div>
-          <label htmlFor="timezone">Timezone</label>
+          <label htmlFor="end_date">End date</label>
           <input
-            id="timezone"
-            value={form.timezone}
-            onChange={(event) => setForm({ ...form, timezone: event.target.value })}
+            id="end_date"
+            type="date"
+            value={form.endDate}
+            onChange={(event) => setForm({ ...form, endDate: event.target.value })}
             required
-            aria-describedby="timezone-help"
           />
-          <p id="timezone-help">IANA timezone for timestamps, or UTC.</p>
-        </div>
-
-        <div>
-          <label htmlFor="adjustment_policy">Adjustment policy</label>
-          <select
-            id="adjustment_policy"
-            value={form.adjustmentPolicy}
-            onChange={(event) => setForm({ ...form, adjustmentPolicy: event.target.value })}
-            aria-describedby="adjustment_policy-help"
-          >
-            <option value="raw">raw</option>
-            <option value="split_adjusted">split_adjusted</option>
-            <option value="total_return_adjusted">total_return_adjusted</option>
-            <option value="unknown">unknown</option>
-          </select>
-          <p id="adjustment_policy-help">
-            <code>unknown</code> imports with a prominent warning and cannot silently become another
-            value later.
-          </p>
         </div>
 
         <div>
@@ -232,25 +182,25 @@ export default function DatasetImportPage() {
               checked={form.allowReimport}
               onChange={(event) => setForm({ ...form, allowReimport: event.target.checked })}
             />{" "}
-            Allow re-importing identical file bytes as a new dataset version
+            Allow re-fetching the same range as a new dataset version
           </label>
         </div>
 
         {clientError ? <p role="alert">{clientError}</p> : null}
 
         <button type="submit" disabled={submitting}>
-          {submitting ? "Importing…" : "Import dataset"}
+          {submitting ? "Fetching…" : "Fetch from Yahoo Finance"}
         </button>
       </form>
 
-      {submitting && <LoadingState label="Importing dataset…" />}
+      {submitting && <LoadingState label="Fetching data from Yahoo Finance…" />}
       {submitError && (
         <>
           <ErrorState error={submitError} />
           {detailText(submitError.details) && <p>Details: {detailText(submitError.details)}</p>}
           {submitError.code === "conflict" && (
             <p>
-              An identical file was already imported. Check the &quot;Allow re-importing&quot; box
+              An identical range was already imported. Check the &quot;Allow re-fetching&quot; box
               above to create a new version anyway, or{" "}
               <Link href="/datasets">browse existing datasets</Link>.
             </p>
