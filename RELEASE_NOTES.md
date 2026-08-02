@@ -118,3 +118,17 @@ historical simulation only.
 - CI (`.github/workflows/ci.yml`) also passed on this task's own PR (#33):
   backend 1m7s, frontend 52s, docker 35s —
   https://github.com/sugianto43/idx-backtest-lab/actions/runs/30746336377.
+
+## Fixed since TASK-016: browser could not reach the API (CORS)
+
+The backend never registered CORS middleware, so every browser-side
+`fetch()` from the frontend to the API was silently blocked (different
+port = different origin) — every page showed "Could not reach the API."
+This had been present since TASK-009 and was undetected because every
+prior Docker smoke test used `curl` (which doesn't enforce CORS) rather
+than a real browser-context request. Fixed by adding `CORSMiddleware`
+with a wildcard origin (`allow_credentials=False`, as required with `*`) —
+appropriate for this local-only, single-user, no-auth tool. Verified with
+a real `OPTIONS` preflight against the rebuilt running container
+(`access-control-allow-origin: *` now present) and `tests/test_cors.py`
+(3 new backend tests, 292 total passing).
