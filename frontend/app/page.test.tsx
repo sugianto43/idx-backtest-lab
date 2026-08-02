@@ -11,9 +11,9 @@ describe("LandingPage", () => {
     expect(headings[0]).toHaveTextContent("IDX Backtesting Lab");
   });
 
-  it("renders content inside a main landmark", () => {
+  it("does not render its own main landmark (the root layout owns it)", () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
   });
 });

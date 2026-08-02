@@ -58,12 +58,12 @@ TASK-001 and TASK-002 must be complete and verified. TASK-008 is required only f
 
 After all checks pass, update status documents and fill:
 
-- Framework/tool versions and commands:
-- API base-URL configuration behavior:
-- Route/component inventory:
-- Commands/tests and results:
-- Accessibility/responsive verification:
-- Deferred UI features/risks:
+- Framework/tool versions and commands: Next.js 16.2.12 (App Router, Turbopack), React 19.2.4, strict TypeScript. No new runtime dependencies — `lib/api/` uses native `fetch`/`AbortController`/`URL`. `npm run format|lint|type-check|test|build` from `frontend/`.
+- API base-URL configuration behavior: `NEXT_PUBLIC_API_BASE_URL` (see `frontend/.env.example`), validated in `lib/api/config.ts::resolveApiBaseUrl()` — must parse as an `http`/`https` URL or every API call short-circuits to a `config_error` `ApiResult` without attempting a network request. No hard-coded fallback host. Next.js inlines `NEXT_PUBLIC_*` at build time, so a production build needs rebuilding after a value change (`next dev` reads it live).
+- Route/component inventory: `/` (landing), `/datasets`, `/runs` (both placeholder, owned by TASK-010), `/strategies` (placeholder, owned by TASK-011), `/system` (client component; liveness → readiness sequential check rendering loading/API-unavailable/database-unavailable/unexpected-error/ready). Shell: `app/layout.tsx` (skip link, `SiteNav`, single `<main>` landmark, `Disclaimer` footer). Reusable: `components/layout/{SiteNav,Disclaimer,PlaceholderRoute}.tsx`, `components/status/{LoadingState,EmptyState,WarningState,UnavailableState,ErrorState}.tsx`. API transport: `lib/api/{config,types,client,health}.ts`.
+- Commands/tests and results: `npm run format` / `lint` / `type-check` all clean; `npm run test` → 27 passed across 8 files (API client normalization, base-URL validation, nav current-page marking, all 5 status components, `/system` state transitions, `/datasets` placeholder shape, disclaimer, landing heading). `npm run build` succeeds (5 static routes). `docker compose build web` succeeds; a standalone `docker run ... npm run dev` + `curl` smoke test confirmed the SSR shell (skip link, nav with `aria-current`, single `<h1>`, footer disclaimer) and the `/system` loading state render correctly.
+- Accessibility/responsive verification: One `<h1>` per route (enforced by tests), landmark structure (`header`/`nav[aria-label="Primary"]`/`main`/`footer`) via SSR HTML inspection, `aria-current="page"` on the active nav link, a focus-visible skip link to `#main-content`, `role="status"` (polite) for loading/warning/unavailable, `role="alert"` for errors. Responsive behavior (`globals.css`: flex column body, `max-width` content columns, wrapping nav, no horizontal overflow) was verified by CSS review and browser resize, not an automated viewport test — jsdom does not perform layout, so no CSS media-query behavior can be asserted in Vitest.
+- Deferred UI features/risks: No `EmptyState` consumer exists yet (reserved for TASK-010's dataset/run lists). `/system`'s "database unavailable" branch has only been exercised against the documented `dependency_unavailable` error code from `docs/API_CONVENTIONS.md`/TASK-002 — any future readiness failure code would currently fall through to the generic `unexpected_error` `ErrorState`, which is a safe default but not a distinct UI state. No dark-mode-specific accessibility contrast audit was run beyond the existing `prefers-color-scheme` CSS variables inherited from TASK-001.
 
 ## Next task boundary
 

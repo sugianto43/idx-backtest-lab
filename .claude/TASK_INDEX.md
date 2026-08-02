@@ -16,8 +16,8 @@ Tasks will live in `tasks/TASK-###-short-name.md`. Before starting a task, read 
 | TASK-006 | Backtest domain model and configuration manifest | Completed | TASK-002, TASK-003, TASK-005 |
 | TASK-007 | Backtrader engine adapter and deterministic smoke strategy | Completed | TASK-004, TASK-006 |
 | TASK-008 | Run artifacts, metrics, and reproducibility audit trail | Completed | TASK-007 |
-| TASK-009 | Frontend shell and typed API client | Specified — ready | TASK-001, TASK-002 |
-| TASK-010 | Dataset/run workflow dashboard | Specified — blocked | TASK-008, TASK-009 |
+| TASK-009 | Frontend shell and typed API client | Completed | TASK-001, TASK-002 |
+| TASK-010 | Dataset/run workflow dashboard | Specified — ready | TASK-008, TASK-009 |
 | TASK-011 | Strategy authoring and validation UX | Specified — blocked | TASK-006, TASK-009, TASK-010 |
 | TASK-012 | Optimization framework with bias safeguards | Specified — blocked | TASK-008, TASK-011 |
 | TASK-013 | End-to-end quality, documentation, and release readiness | Planned | TASK-001–TASK-012 |
