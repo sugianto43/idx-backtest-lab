@@ -20,6 +20,12 @@ class CreateBacktestRunRequest(BaseModel):
     risk_free_rate: str
 
 
+class RunMetricValue(BaseModel):
+    status: str
+    value: str | None
+    reason: str | None
+
+
 class BacktestRunResponse(BaseModel):
     run_id: str
     dataset_id: str
@@ -31,6 +37,8 @@ class BacktestRunResponse(BaseModel):
     manifest: dict[str, Any]
     warning_count: int
     created_at_utc: datetime
+    final_equity: RunMetricValue
+    total_return: RunMetricValue
 
 
 class BacktestRunListResponse(BaseModel):

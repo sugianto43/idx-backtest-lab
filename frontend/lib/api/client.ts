@@ -21,6 +21,8 @@ function isApiErrorBody(value: unknown): value is { error: ApiErrorBody } {
 export interface ApiFetchOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
+  method?: "GET" | "POST";
+  body?: FormData;
 }
 
 /**
@@ -44,8 +46,9 @@ export async function apiFetch<T>(
   let response: Response;
   try {
     response = await fetch(`${config.baseUrl}${path}`, {
-      method: "GET",
+      method: options.method ?? "GET",
       headers: { Accept: "application/json" },
+      body: options.body,
       signal: controller.signal,
     });
   } catch (cause) {
@@ -95,6 +98,7 @@ export async function apiFetch<T>(
           code: parsed.error.code,
           correlationId: parsed.error.correlation_id || correlationId,
           status: response.status,
+          details: parsed.error.details,
         },
       };
     }
